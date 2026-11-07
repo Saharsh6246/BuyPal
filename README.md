@@ -12,9 +12,12 @@ Built for the PayPal *Build What's Next with PayPal and AI* hackathon.
 |---|---|
 | **Conversational agent** | One LLM agent (Groq, free tier) calls deterministic tools: search, scoring, cart, preferences. Falls back to a rule-based parser if the AI is unavailable. |
 | **Product discovery** | Channel3 product search API (price, ratings, availability, specs from listing text). Nothing is invented: missing data is shown as "not listed". |
-| **Adaptive 3-strategy picks** | **Budget**, **Smart** (best value) and **Premium**, scored by code, not by the LLM. Cards merge when one product wins several strategies, and extra cards (runner-up, top rated, stretch) appear based on your history and the data. Each card shows pros, cons, why it was picked, and how it fits your preferences. |
+| **Your priority** | On first visit you choose what matters most: lowest price, best quality, or best balance. Buypal leads with that pick and tunes every ranking and recommendation to it. Change it any time. |
+| **Personalised home** | Searches, likes, cart adds and purchases build an explainable interest list (fading by half every 14 days). The home page shows "Picked for you" and verified deals in those categories, and says which searches it is based on. |
+| **Adaptive 3-strategy picks** | **Best price**, **Best overall** and **Best quality**, scored by code, not by the LLM. Each product also lists the retailers selling it and their prices. Cards merge when one product wins several strategies, and extra cards (runner-up, top rated, stretch) appear based on your history and the data. Each card shows pros, cons, why it was picked, and how it fits your preferences. |
 | **Personalization** | Explainable counters per brand and strategy, with global and per-category scopes. Learns from adds, likes, rejections (with a reason) and purchases. View, edit, delete or reset everything in the profile panel. |
 | **Multi-product carts** | "Build a complete gaming setup under X" allocates budget across parts, picks best value per part, trims or upgrades to fit, and verifies the total never exceeds the budget. Natural-language edits ("replace the mouse with a wireless one and reduce the total by ₹2,000") are re-searched and re-verified. |
+| **Buy now** | One click adds the pick and opens the review-and-pay step. Nothing is charged until you tick the approval box and approve in PayPal. |
 | **PayPal Sandbox** | Orders API v2 with the v6 JS SDK. Server-side amounts, live price re-verification before the order, explicit user approval step, atomic capture lock, idempotency, amount and currency verification, and failed / cancelled / pending handling. |
 
 ## Architecture
@@ -97,7 +100,7 @@ npm run dev
 npm test
 ```
 
-18 tests cover spec extraction, intent parsing, the scoring engine (budget, dedupe, personalization, missing data), the cart optimiser, preference learning, currency handling and the HTTP API.
+21 tests cover spec extraction, intent parsing, the scoring engine (budget, dedupe, personalization, missing data), the cart optimiser, preference learning, your priority setting, the interest model, currency handling and the HTTP API.
 
 ## Known limitations
 

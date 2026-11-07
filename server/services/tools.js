@@ -1,6 +1,7 @@
 import { fmtUsd, toUsd } from '../lib/money.js';
 import { Channel3Error } from './channel3.js';
 import { addItem, CartError, getCart, removeItem, setQuantity } from './cartService.js';
+import { recordSearch } from './interests.js';
 import { setPreference } from './preferences.js';
 import { findProducts, normalizeRequirements } from './recommend.js';
 import { buildSetup, findCartItem, reduceCartTotal, replaceCartItem } from './setupBuilder.js';
@@ -126,6 +127,7 @@ async function runToolInner(ctx, name, args) {
       const req = normalizeRequirements(args);
       if (!req.category && !req.query) return { result: { error: 'A product category is required.' } };
       const outcome = await findProducts(userId, req);
+      recordSearch(userId, { query: args.search_query || [...req.mustHave, req.category].join(' '), category: req.category, budgetUsd: req.budgetMax });
       blocks.push({ type: 'recommendations', category: req.category, budgetUsd: req.budgetMax, requirements: { mustHave: req.mustHave, niceToHave: req.niceToHave }, cards: outcome.cards, notes: outcome.notes, stats: outcome.stats, cheapest: outcome.cheapest || null, profileUsed: outcome.profileUsed });
       return { result: { found: outcome.stats.found, considered: outcome.stats.considered, notes: outcome.notes, options: outcome.cards.map(compactCard), cheapest_available: outcome.cheapest ? { name: outcome.cheapest.name, price_usd: outcome.cheapest.price } : undefined } };
     }

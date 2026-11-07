@@ -29,6 +29,9 @@ async function call(path, { method = 'GET', body } = {}) {
 
 export const api = {
   config: () => call('/config'),
+  me: () => call('/me'),
+  setPriority: (priority) => call('/settings', { method: 'PUT', body: { priority } }),
+  home: () => call('/home'),
   history: () => call('/history'),
   clearHistory: () => call('/history', { method: 'DELETE' }),
   chat: (message) => call('/chat', { method: 'POST', body: { message } }),

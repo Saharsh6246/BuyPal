@@ -195,7 +195,9 @@ export function buildRecommendations(products, req, profile = EMPTY_PROFILE) {
   const best = (list, strategy, skip = new Set()) =>
     [...list].filter((e) => !skip.has(e.product.id)).sort((a, b) => b.scores[strategy] - a.scores[strategy])[0] || null;
 
-  const budgetPool = eligible.filter((e) => e.quality === null || e.quality >= 0.3);
+  // Prefer products with a meaningful number of good reviews, so the cheapest pick is not an unrated no-name listing.
+  const reviewed = eligible.filter((e) => e.quality !== null && e.quality >= 0.3 && e.product.rating.count >= 10);
+  const budgetPool = reviewed.length >= 2 ? reviewed : eligible.filter((e) => e.quality === null || e.quality >= 0.3);
   const picks = {
     Budget: best(budgetPool.length ? budgetPool : eligible, 'Budget'),
     Premium: best(eligible, 'Premium'),
@@ -237,7 +239,9 @@ export function buildRecommendations(products, req, profile = EMPTY_PROFILE) {
   return { cards, notes, stats };
 }
 
-const roleLabel = (roles) => roles.join(' · ');
+const DISPLAY = { Budget: 'Best price', Smart: 'Best overall', Premium: 'Best quality', 'Budget alt': 'Also strong on price', 'Smart alt': 'Also strong overall', 'Premium alt': 'Also strong on quality', 'Top rated': 'Top rated', Stretch: 'Stretch pick' };
+const STYLE = { Budget: 'price', Smart: 'overall value', Premium: 'quality' };
+const roleLabel = (roles) => roles.map((r) => DISPLAY[r] || r).join(' · ');
 
 function makeCard(entry, roles, ctx) {
   const { product } = entry;
@@ -262,11 +266,11 @@ function makeCard(entry, roles, ctx) {
       const premiumEntry = picks.Premium;
       const ratio = premiumEntry.composite > 0 ? Math.round((entry.composite / premiumEntry.composite) * 100) : null;
       positions.push(saved > 0
-        ? `Best value: ${fmtUsd(saved)} (${Math.round((saved / premium.price) * 100)}%) cheaper than the Premium pick${ratio && ratio >= 60 && ratio < 100 ? ` while scoring ${ratio}% as well on fit, ratings and specs` : ''}.`
+        ? `Best overall: ${fmtUsd(saved)} (${Math.round((saved / premium.price) * 100)}%) cheaper than the best-quality pick${ratio && ratio >= 60 && ratio < 100 ? ` while scoring ${ratio}% as well on fit, ratings and specs` : ''}.`
         : 'Best balance of price, ratings, specs and requirement fit.');
     } else positions.push('Best balance of price, ratings, specs and requirement fit.');
   }
-  if (roles.some((r) => r.endsWith(' alt'))) positions.push(`Runner-up in the ${roles.find((r) => r.endsWith(' alt')).replace(' alt', '')} style you usually pick.`);
+  if (roles.some((r) => r.endsWith(' alt'))) positions.push(`Runner-up on ${STYLE[roles.find((r) => r.endsWith(' alt')).replace(' alt', '')]}, which is what you usually choose.`);
   if (roles.includes('Top rated')) positions.push(`Highest buyer rating (${product.rating.value}/5 from ${product.rating.count} reviews) among the options.`);
   if (roles.includes('Stretch')) positions.push(`Above your budget by ${fmtUsd(product.price - budget)}, shown because you allowed higher-priced alternatives.`);
 
@@ -293,7 +297,7 @@ function makeCard(entry, roles, ctx) {
   const brandScore = profile.brand[(product.brand || '').toLowerCase()] || 0;
   if (brandScore >= 1) matches.push(`You've liked ${product.brand} before`);
   if ((req.preferredBrands || []).some((b) => b.toLowerCase() === (product.brand || '').toLowerCase())) matches.push(`Your preferred brand: ${product.brand}`);
-  if (profile.dominant && roles.some((r) => r.replace(' alt', '') === profile.dominant)) matches.push(`Matches your usual ${profile.dominant} preference`);
+  if (profile.dominant && roles.some((r) => r.replace(' alt', '') === profile.dominant)) matches.push(`Matches what you care about most: ${STYLE[profile.dominant]}`);
   if (entry.mustMatched.length) matches.push(`Meets ${entry.mustMatched.length} of your must-haves`);
 
   return {

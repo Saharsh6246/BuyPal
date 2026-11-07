@@ -8,7 +8,8 @@ import { Channel3Error } from './services/channel3.js';
 import { addItem, CartError, clearCart, getCart, removeItem, setQuantity } from './services/cartService.js';
 import { llmUsage } from './services/llm.js';
 import { captureOrder, createOrder, listOrders, PayPalError } from './services/paypal.js';
-import { describeProfile, listPreferences, recordEvent, REJECT_REASONS, resetPreferences, setPreference } from './services/preferences.js';
+import { buildHome } from './services/home.js';
+import { describeProfile, getPriority, listPreferences, PRIORITIES, recordEvent, REJECT_REASONS, resetPreferences, setPreference, setPriority } from './services/preferences.js';
 import { getCachedProduct } from './services/channel3.js';
 
 export const app = express();
@@ -54,8 +55,16 @@ app.get('/api/config', (req, res) => {
     ai: llmUsage(),
     inrPerUsd: config.inrPerUsd,
     rejectReasons: REJECT_REASONS,
+    priorities: PRIORITIES,
   });
 });
+
+app.get('/api/me', requireUser, (req, res) => res.json({ priority: getPriority(req.userId) }));
+app.put('/api/settings', requireUser, wrap(async (req, res) => {
+  try { setPriority(req.userId, req.body?.priority); } catch (error) { return res.status(400).json({ error: error.message }); }
+  res.json({ priority: getPriority(req.userId), summary: describeProfile(req.userId) });
+}));
+app.get('/api/home', requireUser, wrap(async (req, res) => res.json(await buildHome(req.userId))));
 
 app.get('/api/history', requireUser, (req, res) => res.json({ messages: loadHistory(req.userId) }));
 app.delete('/api/history', requireUser, (req, res) => { clearHistory(req.userId); res.json({ ok: true }); });

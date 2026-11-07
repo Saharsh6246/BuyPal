@@ -4,6 +4,25 @@ import { all, ensureUser, get, run } from '../db.js';
 // acts (selects, likes, rejects with a reason, buys). No black-box model: the user can see and edit it all.
 
 const MAX = 5;
+export const PRIORITIES = {
+  price: 'Lowest price that still meets your needs',
+  quality: 'Best quality and performance',
+  balanced: 'The best balance of price and quality',
+};
+const PRIORITY_STRATEGY = { price: 'Budget', quality: 'Premium', balanced: 'Smart' };
+
+export function getSetting(userId, key) {
+  return get('SELECT value FROM user_settings WHERE user_id=? AND key=?', userId, key)?.value ?? null;
+}
+export function setSetting(userId, key, value) {
+  ensureUser(userId);
+  run('INSERT INTO user_settings (user_id, key, value) VALUES (?,?,?) ON CONFLICT(user_id, key) DO UPDATE SET value=excluded.value', userId, key, value);
+}
+export const getPriority = (userId) => { const v = getSetting(userId, 'priority'); return PRIORITIES[v] ? v : null; };
+export function setPriority(userId, priority) {
+  if (!PRIORITIES[priority]) throw new Error('Unknown priority.');
+  setSetting(userId, 'priority', priority);
+}
 const clamp = (value) => Math.max(-MAX, Math.min(MAX, value));
 export const STRATEGIES = ['Budget', 'Smart', 'Premium'];
 const normKey = (dimension, key) => (dimension === 'brand' ? String(key).trim().toLowerCase().slice(0, 80) : String(key).trim());
@@ -35,7 +54,8 @@ export function recordEvent(userId, { type, product = null, strategy = null, rea
   ensureUser(userId);
   const cat = category ? String(category).toLowerCase().slice(0, 60) : null;
   const brand = product?.brand || null;
-  const primaryStrategy = strategy ? String(strategy).split('·')[0].trim() : null;
+  const rawStrategy = strategy ? String(strategy).split('·')[0].replace(' alt', '').trim() : null;
+  const primaryStrategy = STRATEGIES.includes(rawStrategy) ? rawStrategy : null;
   run('INSERT INTO feedback_events (user_id, type, product_id, product_name, brand, category, strategy, reason) VALUES (?,?,?,?,?,?,?,?)',
     userId, type, product?.id || null, product?.name || null, brand, cat, primaryStrategy, reason);
 
@@ -77,11 +97,13 @@ export function getProfile(userId, category) {
     if (!weight) continue;
     merged[row.dimension][row.key] = (merged[row.dimension][row.key] || 0) + row.score * weight;
   }
+  const priority = getPriority(userId);
+  if (priority) merged.strategy[PRIORITY_STRATEGY[priority]] += 3; // the user's stated governing factor
   const strategy = merged.strategy;
   const budgetSensitivity = Math.max(-1, Math.min(1, (strategy.Budget - strategy.Premium) / 4));
   const ranked = Object.entries(strategy).sort((a, b) => b[1] - a[1]);
   const dominant = ranked[0][1] >= 2 && ranked[0][1] - ranked[1][1] >= 1 ? ranked[0][0] : null;
-  return { brand: merged.brand, strategy, budgetSensitivity, dominant };
+  return { brand: merged.brand, strategy, budgetSensitivity, dominant, priority };
 }
 
 export function setPreference(userId, scope, dimension, key, score) {
@@ -101,12 +123,14 @@ export function setPreference(userId, scope, dimension, key, score) {
 export function resetPreferences(userId) {
   run('DELETE FROM preferences WHERE user_id=?', userId);
   run('DELETE FROM feedback_events WHERE user_id=?', userId);
+  run('DELETE FROM search_history WHERE user_id=?', userId);
 }
 
 /** Plain-language summary of what Buypal has learned, shown in the profile panel. */
 export function describeProfile(userId) {
   const profile = getProfile(userId, null);
   const lines = [];
+  if (profile.priority) lines.push(`Your priority: ${PRIORITIES[profile.priority].toLowerCase()}.`);
   if (profile.dominant) lines.push(`You usually pick ${profile.dominant} options, so those are shown first.`);
   if (profile.budgetSensitivity > 0.4) lines.push('You tend to prioritise saving money.');
   if (profile.budgetSensitivity < -0.4) lines.push('You tend to prioritise quality and performance.');

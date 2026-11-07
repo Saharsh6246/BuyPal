@@ -9,6 +9,8 @@ const { optimizeSelection, allocateShares, templateFor } = await import('../serv
 const { normalizeProduct } = await import('../services/channel3.js');
 const { recordEvent, getProfile, setPreference, resetPreferences } = await import('../services/preferences.js');
 const { normalizeRequirements } = await import('../services/recommend.js');
+const { setPriority, getPriority, describeProfile } = await import('../services/preferences.js');
+const { recordSearch, getInterests } = await import('../services/interests.js');
 
 const laptop = (id, name, price, extra = {}) => ({
   id, name, brand: extra.brand || 'Acme', price, currency: 'USD', compareAtPrice: null, availability: 'InStock',
@@ -160,4 +162,47 @@ test('requirements: INR budgets are converted and flagged as approximate', () =>
   assert.match(req.budgetNote, /approximate/);
   const unknown = normalizeRequirements({ category: 'laptop', budget_max: 500, currency: 'XYZ' });
   assert.equal(unknown.budgetMax, null, 'unknown currency is never guessed');
+});
+
+test('priority: the governing factor shapes the profile and can be changed', () => {
+  const user = 'test-user-priority-1';
+  assert.equal(getPriority(user), null);
+  setPriority(user, 'price');
+  let profile = getProfile(user, 'laptop');
+  assert.equal(profile.dominant, 'Budget');
+  assert.ok(profile.budgetSensitivity > 0);
+  setPriority(user, 'quality');
+  profile = getProfile(user, 'laptop');
+  assert.equal(profile.dominant, 'Premium');
+  assert.ok(profile.budgetSensitivity < 0);
+  assert.throws(() => setPriority(user, 'cheapest-ever'));
+  assert.match(describeProfile(user).join(' '), /best quality/i);
+  resetPreferences(user);
+  assert.equal(getPriority(user), 'quality', 'resetting learned preferences keeps the explicit priority');
+});
+
+test('interests: searches and choices build a ranked, explainable interest list', () => {
+  const user = 'test-user-interests-1';
+  recordSearch(user, { query: 'gaming laptop', category: 'laptop', budgetUsd: 900 });
+  recordSearch(user, { query: 'laptop for college', category: 'laptop', budgetUsd: 700 });
+  recordSearch(user, { query: 'wireless mouse', category: 'mouse', budgetUsd: 25 });
+  recordEvent(user, { type: 'purchase', product: { id: 'x', name: 'x', brand: 'a' }, strategy: 'Smart', category: 'laptop' });
+  const { interests, recent } = getInterests(user);
+  assert.equal(interests[0].category, 'laptop');
+  assert.equal(interests[0].typicalBudget, 700);
+  assert.equal(interests[1].category, 'mouse');
+  assert.ok(recent.includes('wireless mouse'));
+  resetPreferences(user);
+  assert.equal(getInterests(user).interests.length, 0, 'reset clears the remembered searches');
+});
+
+test('labels: cards use plain names for the three strategies', () => {
+  const products = [
+    laptop('a', 'Basic Laptop', 400, { text: 'Laptop Core i3 8GB RAM' }),
+    laptop('c', 'Top Laptop', 880, { text: 'Laptop Core i7 32GB RAM 1TB SSD RTX 4060' }),
+  ];
+  const { cards } = buildRecommendations(products, { category: 'laptop', budgetMax: 900, mustHave: [], niceToHave: [] });
+  const labels = cards.map((c) => c.label).join(' ');
+  assert.match(labels, /Best price/);
+  assert.match(labels, /Best quality/);
 });

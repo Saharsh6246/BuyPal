@@ -60,6 +60,10 @@ export function normalizeProduct(raw) {
     merchant: offer?.domain || '',
     buyUrl: offer?.url || '',
     availability: offer?.availability || null,
+    offers: offers.filter((o) => o?.price?.price != null && o?.url).map((o) => ({
+      merchant: o.domain || '', price: roundMoney(Number(o.price.price), (o.price.currency || 'USD').toUpperCase()),
+      currency: (o.price.currency || 'USD').toUpperCase(), url: o.url, availability: o.availability || null, condition: o.condition || null,
+    })).sort((a, b) => a.price - b.price).slice(0, 6),
     condition: offer?.condition || null,
     rating,
     category: raw.category ? { slug: raw.category.slug || '', title: raw.category.title || '', path: (raw.category.path || []).map((p) => p.title) } : null,
