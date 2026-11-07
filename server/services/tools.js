@@ -2,6 +2,7 @@ import { fmtUsd, toUsd } from '../lib/money.js';
 import { Channel3Error } from './channel3.js';
 import { addItem, CartError, getCart, removeItem, setQuantity } from './cartService.js';
 import { userModelForLlm } from './insights.js';
+import { canAfford, COSTS, getBalance, spend, UNIT } from './wallet.js';
 import { recordSearch } from './interests.js';
 import { setPreference } from './preferences.js';
 import { findProducts, normalizeRequirements } from './recommend.js';
@@ -119,9 +120,33 @@ function wrapError(error) {
 }
 
 /** Runs one tool. Returns { result } for the LLM (compact) and pushes UI blocks into ctx.blocks. */
+/** What a tool call costs in Pal Points (reading the cart, preferences and the like are free). */
+function toolCost(name, args) {
+  if (name === 'find_products') return COSTS.search;
+  if (name === 'build_setup') return COSTS.setup;
+  if (name === 'modify_cart' && ['replace_item', 'reduce_total'].includes(args.action)) return COSTS.search;
+  return 0;
+}
+
 export async function runTool(ctx, name, args = {}) {
+  const cost = toolCost(name, args);
+  if (cost && !canAfford(ctx.userId, cost)) {
+    const balance = getBalance(ctx.userId);
+    const message = `This needs ${cost} ${UNIT.name} and you have ${balance}. Top up with PayPal or claim points from a PayPal checkout to continue.`;
+    ctx.blocks.push({ type: 'outOfPoints', needed: cost, balance, unit: UNIT.name });
+    if (Array.isArray(ctx.errors)) ctx.errors.push(message);
+    return { result: { error: message, out_of_points: true } };
+  }
+
+  const blocksBefore = ctx.blocks.length;
   const outcome = await runToolInner(ctx, name, args);
   if (outcome.result?.error && Array.isArray(ctx.errors)) ctx.errors.push(outcome.result.error);
+
+  // Points are spent only for work that produced a result: failed or empty searches are free.
+  const produced = ctx.blocks.slice(blocksBefore).some((b) => (b.type === 'recommendations' ? b.cards.length > 0 : ['setupBaskets', 'cart'].includes(b.type)));
+  if (cost && !outcome.result?.error && produced) {
+    spend(ctx.userId, cost, name === 'build_setup' ? 'setup' : 'search', name === 'build_setup' ? `Setup: ${String(args.goal || '').slice(0, 60)}` : `Search: ${String(args.search_query || args.category || args.item || '').slice(0, 60)}`);
+  }
   return outcome;
 }
 

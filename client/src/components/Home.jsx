@@ -3,6 +3,8 @@ import { api, inr, money } from '../api.js';
 import { BUCKETS } from '../buckets.js';
 import { IconArrowRight, IconSearch, IconShield } from './icons.jsx';
 import { DemoBadge } from './ProductCard.jsx';
+import { useWallet } from '../wallet.jsx';
+import { IconCoin } from './icons.jsx';
 import PriorityPicker from './PriorityPicker.jsx';
 
 const EXAMPLES = [
@@ -46,6 +48,7 @@ function Tile({ item, inCart, onAdded, onSearch }) {
 
 export default function Home({ home, loading, priority, onPriority, cartIds, onCart, onSearch }) {
   const [draft, setDraft] = useState('');
+  const { wallet, openWallet } = useWallet();
   const submit = (e) => { e.preventDefault(); if (draft.trim().length >= 2) onSearch(draft); };
 
   return (
@@ -63,6 +66,9 @@ export default function Home({ home, loading, priority, onPriority, cartIds, onC
                 placeholder="Describe what you need, e.g. organic honey 250 g" className="min-w-0 flex-1 bg-transparent px-1 py-3 text-[16px] outline-none placeholder:text-muted/70" />
               <button type="submit" className="btn btn-primary !py-3" disabled={draft.trim().length < 2}>Search</button>
             </form>
+            {wallet && (
+              <p className="mt-4 flex max-w-2xl items-center gap-2 text-[13.5px] text-muted"><IconCoin size={18} className="flex-none text-azure" />You have <b className="num text-navy">{wallet.balance} {wallet.unit.name}</b>. A search costs {wallet.costs.search}. Earn more by paying with PayPal. <button type="button" className="link" onClick={() => openWallet()}>Open wallet</button></p>
+            )}
             <div className="mt-4 flex max-w-2xl flex-wrap gap-2">
               {EXAMPLES.map((example) => (
                 <button key={example} type="button" onClick={() => onSearch(example)} className="chip !font-medium !text-muted transition hover:border-azure hover:!text-azure">{example}</button>

@@ -4,6 +4,7 @@ import { getCart } from './cartService.js';
 import { heuristicPlan } from './intent.js';
 import { chatCompletion, llmAvailable, llmUsage, LlmUnavailable } from './llm.js';
 import { runTool, TOOL_DEFINITIONS } from './tools.js';
+import { getBalance } from './wallet.js';
 
 // Architecture: ONE orchestrating agent that calls specialised, deterministic tools (search, scoring, cart,
 // preferences). Payments are not a tool: they only happen through the checkout endpoints after the user approves.
@@ -20,6 +21,7 @@ Rules:
 - Extract must_have (essential) vs nice_to_have (secondary) requirements from the message. Ask one short clarifying question only if you cannot tell what product they want.
 - For "build/complete setup" requests use build_setup: it returns several complete baskets (best overall, best quality, best price), each within the budget. Pass priority_hint from the user's words (e.g. "high quality yet affordable" = balanced). Recommend one basket and say why. Buypal does not place orders at retailers: the shopper opens a basket and buys each part through the retailer links. For changes to an existing cart use modify_cart. Never claim a total or change that a tool did not report.
 - You cannot take payment or place orders. For setup baskets, tell the user to open the basket they like and buy each part at the retailer links (Amazon, Walmart, Best Buy and others); Buypal cannot order for them. A single item can also go through the PayPal Sandbox checkout, which is only a demo: no real retailer order or delivery is created. Never say a basket can be paid for with PayPal.
+- Searches and setups cost Pal Points, Buypal's in-app currency (a search costs 1, a complete setup 4). Shoppers earn points by paying with PayPal: a verified top-up through Buypal, or by claiming a PayPal checkout they made at a retailer. If a tool returns out_of_points, say so in one sentence and point them to the wallet; do not retry. Never claim points were earned or spent unless a tool said so.
 - When you quote money, give the basket total and the budget separately, exactly as the tool reports them (do not call a total a budget). Mention rupee amounts only as approximate.
 - Do not describe Buypal as providing escrow or guaranteed delivery.`;
 
@@ -43,6 +45,8 @@ function summarizeBlocks(blocks, plan, errors = []) {
       if (!block.cards.length) lines.push(block.notes[0] || 'I could not find matching products. Try a broader description or a higher budget.');
       else lines.push(`Here ${block.cards.length === 1 ? 'is' : 'are'} ${block.cards.length} pick${block.cards.length === 1 ? '' : 's'} for ${block.category || 'your search'}${block.budgetUsd ? ` within about ${fmtUsd(block.budgetUsd)}` : ''}: ${block.cards.map((c) => c.label).join(', ')}. Each card explains why it was chosen.`);
       if (block.notes.length && block.cards.length) lines.push(block.notes[0]);
+    } else if (block.type === 'outOfPoints') {
+      lines.push(`You have ${block.balance} ${block.unit} and this needs ${block.needed}. Open your wallet to top up with PayPal or claim points from a PayPal checkout.`);
     } else if (block.type === 'setupBaskets') {
       lines.push(`I built ${block.baskets.length} complete setup${block.baskets.length === 1 ? '' : 's'} within ${fmtUsd(block.budget)}: ${block.baskets.map((b) => `${b.label} (${fmtUsd(b.total)})`).join(', ')}. Open one to see where to buy each part.`);
     } else if (block.type === 'setup') {
@@ -101,6 +105,7 @@ async function runWithRules(userId, text, blocks) {
 export async function handleMessage(userId, rawText) {
   ensureUser(userId);
   const text = String(rawText || '').trim().slice(0, 1000);
+  const balanceBefore = getBalance(userId);
   saveMessage(userId, 'user', text);
   const blocks = [];
   let reply = '';
@@ -136,5 +141,6 @@ export async function handleMessage(userId, rawText) {
   }[notice] || null : null;
 
   saveMessage(userId, 'assistant', reply, blocks.length ? blocks : null);
-  return { reply, blocks, mode, notice: noticeText, usage: llmUsage() };
+  const balance = getBalance(userId);
+  return { reply, blocks, mode, notice: noticeText, usage: llmUsage(), wallet: { balance, spent: Math.max(0, balanceBefore - balance) } };
 }

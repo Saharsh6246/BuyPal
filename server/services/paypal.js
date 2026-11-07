@@ -6,6 +6,7 @@ import { cartFingerprint, clearCart, getCart } from './cartService.js';
 import { getCachedProduct } from './channel3.js';
 import { refreshListing as refreshProduct } from './catalog.js';
 import { recordEvent } from './preferences.js';
+import { creditOnce, getBalance, getPack, UNIT } from './wallet.js';
 
 // PayPal Sandbox Orders v2. The server owns every amount; the browser only ever receives an order id.
 // The LLM has no access to this module, and capture only runs after the user approves inside PayPal.
@@ -102,22 +103,60 @@ export async function createOrder(userId) {
   return { orderId: data.id, amount: total, currency: 'USD' };
 }
 
-const receiptOf = (order) => ({
+const receiptOf = (order, userId) => ({
   status: order.status,
+  kind: order.kind || 'cart',
   orderId: order.paypal_order_id,
   captureId: order.capture_id || '',
   amount: order.amount,
   currency: order.currency,
+  ...(order.kind === 'topup' && order.status === 'COMPLETED'
+    ? { points: JSON.parse(order.items_json).points, balance: getBalance(userId), unit: UNIT.name }
+    : {}),
 });
+
+/**
+ * Creates a PayPal Sandbox order for a points pack. The amount comes from the server's own pack list, never the browser,
+ * and points are only credited after the capture is verified. This is the verifiable way to earn points.
+ */
+export async function createTopUpOrder(userId, packId) {
+  if (!hasPaypal()) throw new PayPalError('PayPal Sandbox is not configured. Add the REST app credentials to .env.', 503);
+  const pack = getPack(packId);
+  if (!pack) throw new PayPalError('Unknown points pack.', 400);
+
+  const token = await accessToken();
+  const response = await fetch(`${config.paypalBase}/v2/checkout/orders`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${token}`, 'paypal-request-id': randomUUID(), prefer: 'return=representation' },
+    body: JSON.stringify({
+      intent: 'CAPTURE',
+      purchase_units: [{
+        description: `Buypal Sandbox demo: ${pack.points} ${UNIT.name}. No real money moves.`,
+        items: [{ name: `${pack.points} ${UNIT.name}`, quantity: '1', unit_amount: { currency_code: 'USD', value: pack.priceUsd }, category: 'DIGITAL_GOODS' }],
+        amount: { currency_code: 'USD', value: pack.priceUsd, breakdown: { item_total: { currency_code: 'USD', value: pack.priceUsd } } },
+      }],
+      payment_source: { paypal: { experience_context: { user_action: 'PAY_NOW', shipping_preference: 'NO_SHIPPING' } } },
+    }),
+    signal: AbortSignal.timeout(20000),
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data.id) {
+    console.error(`PayPal top-up order creation failed with HTTP ${response.status}`);
+    throw new PayPalError('PayPal could not create the Sandbox order. Check the REST app credentials.');
+  }
+  run(`INSERT INTO orders (user_id, paypal_order_id, status, amount, currency, items_json, fingerprint, capture_request_id, kind)
+       VALUES (?,?,?,?,?,?,?,?, 'topup')`, userId, data.id, 'CREATED', pack.priceUsd, 'USD', JSON.stringify({ packId: pack.id, points: pack.points }), 'topup', randomUUID());
+  return { orderId: data.id, amount: pack.priceUsd, currency: 'USD', points: pack.points };
+}
 
 export async function captureOrder(userId, orderId) {
   if (!hasPaypal()) throw new PayPalError('PayPal Sandbox is not configured.', 503);
   const order = get('SELECT * FROM orders WHERE paypal_order_id=? AND user_id=?', orderId, userId);
   if (!order) throw new PayPalError('PayPal order not found for this shopping session.', 404);
-  if (order.status === 'COMPLETED') return receiptOf(order); // idempotent: never capture twice
+  if (order.status === 'COMPLETED') return receiptOf(order, userId); // idempotent: never capture twice
   if (order.status === 'CAPTURING') throw new PayPalError('Payment is already being processed. Please wait.', 409);
-  if (order.status === 'PENDING') return { ...receiptOf(order), message: 'PayPal reports that this payment is still pending.' };
-  if (cartFingerprint(userId) !== order.fingerprint) {
+  if (order.status === 'PENDING') return { ...receiptOf(order, userId), message: 'PayPal reports that this payment is still pending.' };
+  if (order.kind !== 'topup' && cartFingerprint(userId) !== order.fingerprint) {
     throw new PayPalError('Your cart changed during checkout. The approved payment was not captured; review your cart and check out again.', 409);
   }
 
@@ -145,11 +184,17 @@ export async function captureOrder(userId, orderId) {
       && capture.amount?.value === order.amount && capture.amount?.currency_code === order.currency;
     if (verified) {
       run("UPDATE orders SET status='COMPLETED', capture_id=?, updated_at=datetime('now') WHERE paypal_order_id=?", capture.id || '', orderId);
-      for (const item of JSON.parse(order.items_json)) {
-        recordEvent(userId, { type: 'purchase', product: { id: item.id, name: item.name, brand: item.brand }, strategy: item.strategy, category: item.role });
+      if (order.kind === 'topup') {
+        // Credited once per PayPal order id, so a retry or a double request can never pay out twice.
+        const { points } = JSON.parse(order.items_json);
+        creditOnce(userId, points, 'topup', orderId, `PayPal top-up (${points} ${UNIT.name})`);
+      } else {
+        for (const item of JSON.parse(order.items_json)) {
+          recordEvent(userId, { type: 'purchase', product: { id: item.id, name: item.name, brand: item.brand }, strategy: item.strategy, category: item.role });
+        }
+        clearCart(userId);
       }
-      clearCart(userId);
-      return receiptOf(get('SELECT * FROM orders WHERE paypal_order_id=?', orderId));
+      return receiptOf(get('SELECT * FROM orders WHERE paypal_order_id=?', orderId), userId);
     }
     if (capture?.status === 'PENDING' || data.status === 'PENDING') {
       run("UPDATE orders SET status='PENDING', updated_at=datetime('now') WHERE paypal_order_id=?", orderId);
@@ -166,6 +211,6 @@ export async function captureOrder(userId, orderId) {
 }
 
 export function listOrders(userId) {
-  return all('SELECT paypal_order_id, status, amount, currency, items_json, capture_id, created_at FROM orders WHERE user_id=? AND status IN (\'COMPLETED\',\'PENDING\') ORDER BY id DESC LIMIT 20', userId)
+  return all('SELECT paypal_order_id, status, amount, currency, items_json, capture_id, created_at FROM orders WHERE user_id=? AND kind=\'cart\' AND status IN (\'COMPLETED\',\'PENDING\') ORDER BY id DESC LIMIT 20', userId)
     .map((row) => ({ orderId: row.paypal_order_id, status: row.status, amount: row.amount, currency: row.currency, items: JSON.parse(row.items_json), captureId: row.capture_id, createdAt: row.created_at }));
 }

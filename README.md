@@ -63,6 +63,19 @@ Design choices:
 - **SQLite** (built into Node 22+) means zero database setup and persistence across restarts.
 - Identity is an anonymous per-browser id (no passwords). Swap it for real auth before any production use.
 
+## Pal Points: PayPal rewards for a shopper who shops with Buypal
+
+Buypal's AI work is paid for in **Pal Points** (rename them in one place: `UNIT` in `server/services/wallet.js`). Points have no cash value and cannot be withdrawn.
+
+| | |
+|---|---|
+| **Start** | Every new shopper gets 25 points. |
+| **Spend** | A product search costs 1 point and a complete setup costs 4. Failed or empty searches, the home feed and plain conversation are free. Spending is atomic and a balance can never go negative. |
+| **Earn 1: top up with PayPal (verified)** | Packs of 25, 75 or 200 points are bought through a PayPal Sandbox order to Buypal's own merchant account. The amount comes from the server's pack list, the capture is verified with PayPal (status, amount and currency), and points are credited once per PayPal order id, so a retry cannot pay twice. |
+| **Earn 2: pay with PayPal at a retailer (self-reported)** | Product cards and baskets nudge shoppers to choose PayPal at the retailer's checkout, then claim up to 50 points (1 per $1, minimum 5). The shopper enters the store, amount and the PayPal transaction ID. |
+
+> **About reward claims.** Buypal cannot see what a shopper pays at Amazon, Walmart or any other retailer, and PayPal offers no API that reveals a user's payments at third-party merchants. Claims are therefore **self-reported**: they are checked for format (a PayPal transaction ID is 17 letters and digits), limited to 3 a day, each transaction ID can be claimed once across all users, and the ledger labels them "self-reported". Real verification would need retailer conversion data (for example affiliate postbacks) or a PayPal partner integration. The verified earning path is the top-up.
+
 ## Brand and design
 
 The logo (`design/logo/buypal-mark.svg`) is a shopping bag with a navy handle and a check: buying, verified. The interface is built from it: navy for structure and text, azure for actions and key data, mist and white surfaces, crisp 1px lines, tabular numerals, and a Outfit / Instrument Sans type pairing. Tokens live in `client/src/index.css`; the card bucket colours in `client/src/buckets.js`. The wordmark and icons are in `client/src/components/Logo.jsx` and `icons.jsx`. The other logo explorations are in `design/logo-concepts.html`.

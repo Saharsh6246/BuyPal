@@ -30,6 +30,9 @@ async function call(path, { method = 'GET', body } = {}) {
 export const api = {
   config: () => call('/config'),
   me: () => call('/me'),
+  wallet: () => call('/wallet'),
+  claimCheckout: (payload) => call('/wallet/claims', { method: 'POST', body: payload }),
+  createTopUp: (packId) => call('/wallet/topup/orders', { method: 'POST', body: { packId } }),
   selectSetup: (items, strategy, goal, budget) => call('/setups/select', { method: 'POST', body: { items, strategy, goal, budget } }),
   insights: () => call('/insights'),
   setPriority: (priority) => call('/settings', { method: 'PUT', body: { priority } }),

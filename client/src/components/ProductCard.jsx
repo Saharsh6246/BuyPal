@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { api, inr, money } from '../api.js';
 import { bucketOf } from '../buckets.js';
-import { IconCheck, IconExternal, IconStar } from './icons.jsx';
+import { useWallet } from '../wallet.jsx';
+import { IconCheck, IconCoin, IconExternal, IconStar } from './icons.jsx';
 
 const isLink = (url) => /^https?:\/\//.test(url || '');
 
@@ -57,6 +58,7 @@ export default function ProductCard({ card, category, inCart, onAdded, rejectRea
 
   const discount = product.compareAtPrice ? Math.round((1 - product.price / product.compareAtPrice) * 100) : 0;
   const retailerLink = isLink(product.buyUrl);
+  const { wallet, openWallet } = useWallet();
 
   return (
     <article className="card flex flex-col overflow-hidden animate-rise">
@@ -122,6 +124,9 @@ export default function ProductCard({ card, category, inCart, onAdded, rejectRea
               : <span className="btn btn-outline !cursor-default !border-dashed !text-muted">No retailer page</span>}
             <button type="button" className="btn btn-outline" disabled={busy || inCart} onClick={add}>{inCart ? 'In cart' : busy ? 'Adding…' : 'Add to cart'}</button>
           </div>
+          {retailerLink && wallet && (
+            <p className="flex items-start gap-1.5 text-xs leading-snug text-muted"><IconCoin size={15} className="mt-px flex-none text-azure" />Pay with PayPal at checkout, then <button type="button" className="link text-xs" onClick={() => openWallet()}>claim up to {wallet.claimRules.maxPointsPerClaim} {wallet.unit.name}</button>.</p>
+          )}
           <div className="flex items-center justify-between text-[13px]">
             <span className="text-xs text-muted">{product.demo ? 'Simulated listing' : `via ${product.source || 'retailer'}`}</span>
             {feedback ? <span className="font-medium text-mint">{feedback}</span> : (

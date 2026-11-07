@@ -7,7 +7,8 @@ import { clearHistory, handleMessage, loadHistory } from './services/agent.js';
 import { Channel3Error } from './services/channel3.js';
 import { addItem, CartError, clearCart, getCart, removeItem, setQuantity } from './services/cartService.js';
 import { llmUsage } from './services/llm.js';
-import { captureOrder, createOrder, listOrders, PayPalError } from './services/paypal.js';
+import { captureOrder, createOrder, createTopUpOrder, listOrders, PayPalError } from './services/paypal.js';
+import { claimExternalCheckout, walletSummary, WalletError } from './services/wallet.js';
 import { buildHome } from './services/home.js';
 import { selectSetupBasket } from './services/setupBuilder.js';
 import { getUserModel } from './services/insights.js';
@@ -42,7 +43,7 @@ const wrap = (handler) => async (req, res) => {
   try {
     await handler(req, res);
   } catch (error) {
-    if (error instanceof CartError || error instanceof Channel3Error || error instanceof PayPalError) {
+    if (error instanceof CartError || error instanceof Channel3Error || error instanceof PayPalError || error instanceof WalletError) {
       return res.status(error.status || 400).json({ error: error.message, ...(error.extra || {}) });
     }
     console.error('Unhandled error:', error?.message || error);
@@ -119,6 +120,16 @@ app.put('/api/preferences', requireUser, wrap(async (req, res) => {
   res.json({ preferences: listPreferences(req.userId), summary: describeProfile(req.userId) });
 }));
 app.delete('/api/preferences', requireUser, (req, res) => { resetPreferences(req.userId); res.json({ preferences: [], summary: [] }); });
+
+// ---- Pal Points wallet ----
+app.get('/api/wallet', requireUser, (req, res) => res.json(walletSummary(req.userId)));
+// Self-reported PayPal checkout at an external retailer (Buypal cannot see retailer orders): validated, capped, de-duplicated.
+app.post('/api/wallet/claims', requireUser, wrap(async (req, res) => {
+  const outcome = claimExternalCheckout(req.userId, req.body || {});
+  res.status(201).json({ ...outcome, wallet: walletSummary(req.userId) });
+}));
+// Verifiable top-up: a PayPal Sandbox order to Buypal's own merchant account. It is captured through the normal capture route.
+app.post('/api/wallet/topup/orders', requireUser, wrap(async (req, res) => res.status(201).json(await createTopUpOrder(req.userId, req.body?.packId))));
 
 // ---- PayPal Sandbox ----
 app.post('/api/paypal/orders', requireUser, wrap(async (req, res) => res.status(201).json(await createOrder(req.userId))));

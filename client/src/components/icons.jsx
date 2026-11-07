@@ -17,3 +17,4 @@ export const IconClose = make(<path d="m6 6 12 12M18 6 6 18" />);
 export const IconShield = make(<><path d="M12 3 5 6v5c0 4.400 2.900 8.300 7 10 4.100-1.700 7-5.600 7-10V6l-7-3Z" /><path d="m9 12 2.200 2.200L15 10.500" /></>);
 export const IconTag = make(<><path d="M3 12V4h8l10 10-8 8L3 12Z" /><circle cx="7.500" cy="8.500" r="1.200" /></>);
 export const IconSparkle = make(<><path d="M12 3v4M12 17v4M3 12h4M17 12h4" /><path d="m6.500 6.500 2 2m7 7 2 2m0-11-2 2m-7 7-2 2" /></>);
+export const IconCoin = make(<><circle cx="12" cy="12" r="8.500" /><path d="M9.500 12.200 11.200 14l3.300-3.800" /></>);

@@ -94,6 +94,25 @@ CREATE TABLE IF NOT EXISTS search_history (
   budget_usd REAL,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS points_ledger (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  delta INTEGER NOT NULL,         -- positive = earned, negative = spent
+  reason TEXT NOT NULL,           -- welcome | search | setup | topup | paypal_claim | ...
+  ref TEXT,                       -- external reference (PayPal order id, claimed transaction id, ...)
+  note TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE UNIQUE INDEX IF NOT EXISTS points_ledger_once ON points_ledger (reason, ref) WHERE ref IS NOT NULL;
+CREATE TABLE IF NOT EXISTS point_claims (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id TEXT NOT NULL,
+  merchant TEXT NOT NULL,
+  transaction_id TEXT NOT NULL UNIQUE,
+  amount_usd REAL NOT NULL,
+  points INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 CREATE TABLE IF NOT EXISTS provider_usage (
   provider TEXT NOT NULL,
   month TEXT NOT NULL,
@@ -105,6 +124,9 @@ CREATE TABLE IF NOT EXISTS llm_usage (
   calls INTEGER NOT NULL DEFAULT 0
 );
 `);
+
+// Older databases predate the order "kind" (cart purchase vs points top-up).
+try { db.exec("ALTER TABLE orders ADD COLUMN kind TEXT NOT NULL DEFAULT 'cart'"); } catch { /* column already exists */ }
 
 export const run = (sql, ...params) => db.prepare(sql).run(...params);
 export const get = (sql, ...params) => db.prepare(sql).get(...params);

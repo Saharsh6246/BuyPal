@@ -18,6 +18,18 @@ export function BudgetBar({ total, budget }) {
   );
 }
 
+export function OutOfPoints({ block, onOpenWallet }) {
+  return (
+    <section className="card mt-4 flex max-w-3xl flex-col gap-3 border-azure/30 bg-azure/5 p-5 animate-rise sm:flex-row sm:items-center sm:justify-between">
+      <div>
+        <h3 className="display text-lg font-semibold text-navy">You are out of {block.unit}</h3>
+        <p className="mt-0.5 text-[13.5px] text-muted">This needs {block.needed} and you have {block.balance}. Pay with PayPal to earn more: top up instantly, or claim a PayPal checkout you made at a retailer.</p>
+      </div>
+      <button type="button" onClick={onOpenWallet} className="btn btn-primary flex-none">Open wallet</button>
+    </section>
+  );
+}
+
 export function Notes({ notes }) {
   if (!notes?.length) return null;
   return <ul className="mb-4 space-y-1 rounded-lg border border-amber/30 bg-amber/5 px-4 py-3 text-[13px] text-amber">{notes.map((n) => <li key={n}>{n}</li>)}</ul>;

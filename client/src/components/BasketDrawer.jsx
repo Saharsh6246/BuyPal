@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { api, inr, money } from '../api.js';
 import { BudgetBar } from './Blocks.jsx';
-import { IconClose, IconExternal } from './icons.jsx';
+import { useWallet } from '../wallet.jsx';
+import { IconClose, IconCoin, IconExternal } from './icons.jsx';
 
 const isLink = (url) => /^https?:\/\//.test(url || '');
 
@@ -10,6 +11,7 @@ export default function BasketDrawer({ view, onClose }) {
   const [bought, setBought] = useState({});
   const [copied, setCopied] = useState(false);
   const open = Boolean(view);
+  const { wallet, openWallet } = useWallet();
   const basket = view?.basket;
   const block = view?.block;
 
@@ -70,6 +72,9 @@ export default function BasketDrawer({ view, onClose }) {
                           {isLink(p.buyUrl)
                             ? <a href={p.buyUrl} target="_blank" rel="noopener noreferrer" onClick={() => click(item)} className="btn btn-primary !py-2">Buy at {p.merchant || 'retailer'} <IconExternal size={16} /></a>
                             : <span className="text-xs italic text-muted">No retailer link for this listing</span>}
+                          {opened[p.id] && bought[p.id] && wallet && (
+                            <button type="button" className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-azure hover:underline" onClick={() => openWallet({ merchant: p.merchant || '', amount: Math.round(p.price * item.quantity * 100) / 100 })}><IconCoin size={15} />Paid with PayPal? Claim {wallet.unit.name}</button>
+                          )}
                           {opened[p.id] && (
                             <label className="flex items-center gap-1.5 text-[13px] text-navy">
                               <input type="checkbox" checked={Boolean(bought[p.id])} onChange={(e) => markBought(item, e.target.checked)} className="h-4 w-4 accent-azure" />

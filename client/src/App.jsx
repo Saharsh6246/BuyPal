@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, setInrRate } from './api.js';
 import BasketDrawer from './components/BasketDrawer.jsx';
-import { CartBlock, Recommendations } from './components/Blocks.jsx';
+import { CartBlock, OutOfPoints, Recommendations } from './components/Blocks.jsx';
 import CartDrawer from './components/CartDrawer.jsx';
 import Header from './components/Header.jsx';
 import Home from './components/Home.jsx';
 import { LogoMark } from './components/Logo.jsx';
 import ProfileDrawer from './components/ProfileDrawer.jsx';
 import SetupBaskets from './components/SetupBaskets.jsx';
+import WalletDrawer from './components/WalletDrawer.jsx';
+import { WalletContext } from './wallet.jsx';
 
 const EMPTY_CART = { items: [], count: 0, total: 0, budget: null, currency: 'USD' };
 
@@ -35,6 +37,8 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [drawer, setDrawer] = useState(null);
   const [basketView, setBasketView] = useState(null);
+  const [wallet, setWallet] = useState(null);
+  const [claimPrefill, setClaimPrefill] = useState(null);
   const [error, setError] = useState('');
   const bottomRef = useRef(null);
 
@@ -49,6 +53,7 @@ export default function App() {
     api.me().then((m) => setPriority(m.priority)).catch(() => {});
     api.history().then((d) => setMessages(d.messages)).catch(() => {});
     api.cart().then(setCart).catch(() => {});
+    api.wallet().then(setWallet).catch(() => {});
     refreshOrders();
   }, [refreshOrders]);
 
@@ -67,6 +72,7 @@ export default function App() {
       const res = await api.chat(message);
       setMessages((m) => [...m, { role: 'assistant', content: res.reply, blocks: res.blocks, notice: res.notice }]);
       setCart(res.cart);
+      if (res.wallet) setWallet((w) => (w ? { ...w, balance: res.wallet.balance } : w));
       setConfig((c) => (c ? { ...c, ai: res.usage } : c));
     } catch (e) {
       setError(e.message);
@@ -79,12 +85,14 @@ export default function App() {
     setPriority(value);
     try { await api.setPriority(value); setHome(null); if (showingHome) loadHome(); } catch (e) { setError(e.message); }
   };
+  const openWallet = (prefill = null) => { setClaimPrefill(prefill); setDrawer('wallet'); };
   const startOver = async () => { await api.clearHistory(); setMessages([]); setHome(null); };
   const cartIds = useMemo(() => new Set(cart.items.map((i) => i.id)), [cart]);
 
   return (
+    <WalletContext.Provider value={{ wallet, openWallet }}>
     <div className="flex h-full flex-col">
-      <Header ai={config?.ai} cartCount={cart.count} showHome={showingHome} onHome={startOver} onProfile={() => setDrawer('profile')} onCart={() => setDrawer('cart')} />
+      <Header ai={config?.ai} wallet={wallet} onWallet={() => openWallet()} cartCount={cart.count} showHome={showingHome} onHome={startOver} onProfile={() => setDrawer('profile')} onCart={() => setDrawer('cart')} />
 
       <main className="scroll-thin flex-1 overflow-y-auto">
         {showingHome ? (
@@ -105,6 +113,7 @@ export default function App() {
                         {m.blocks?.map((block, i) => {
                           if (block.type === 'recommendations') return <Recommendations key={i} block={block} cartIds={cartIds} onCart={setCart} rejectReasons={config?.rejectReasons} />;
                           if (block.type === 'setupBaskets') return <SetupBaskets key={i} block={block} onOpen={(basket) => setBasketView({ basket, block })} onUseAsCart={(c) => { setCart(c); setDrawer('cart'); }} />;
+                          if (block.type === 'outOfPoints') return <OutOfPoints key={i} block={block} onOpenWallet={() => openWallet()} />;
                           if (block.type === 'setup') return <CartBlock key={i} block={block} title="Your proposed setup" onOpenCart={() => setDrawer('cart')} />;
                           if (block.type === 'cart') return <CartBlock key={i} block={block} onOpenCart={() => setDrawer('cart')} />;
                           return null;
@@ -133,7 +142,7 @@ export default function App() {
                 className="max-h-32 min-h-[44px] flex-1 resize-none overflow-hidden bg-transparent px-3 py-3 text-[15px] outline-none placeholder:text-muted/70" />
               <button type="submit" disabled={loading || input.trim().length < 2} className="btn btn-primary !py-3">Send</button>
             </form>
-            <p className="mt-1.5 text-center text-[11px] text-muted">Buypal shows only what listings state. Prices and availability can change at the retailer.</p>
+            <p className="mt-1.5 text-center text-[11px] text-muted">Buypal shows only what listings state. Prices and availability can change at the retailer.{wallet && ` A search costs ${wallet.costs.search} ${wallet.unit.name}; you have ${wallet.balance}.`}</p>
           </div>
         </footer>
       )}
@@ -141,7 +150,9 @@ export default function App() {
 
       <CartDrawer open={drawer === 'cart'} onClose={() => setDrawer(null)} cart={cart} setCart={setCart} orders={orders} refreshOrders={refreshOrders} />
       <BasketDrawer view={basketView} onClose={() => setBasketView(null)} />
+      <WalletDrawer open={drawer === 'wallet'} onClose={() => setDrawer(null)} wallet={wallet} prefill={claimPrefill} onWallet={setWallet} />
       <ProfileDrawer open={drawer === 'profile'} onClose={() => setDrawer(null)} priority={priority} onPriority={choosePriority} onReset={() => setHome(null)} />
     </div>
+    </WalletContext.Provider>
   );
 }
