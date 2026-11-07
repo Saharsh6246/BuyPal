@@ -9,6 +9,7 @@ import { addItem, CartError, clearCart, getCart, removeItem, setQuantity } from 
 import { llmUsage } from './services/llm.js';
 import { captureOrder, createOrder, listOrders, PayPalError } from './services/paypal.js';
 import { buildHome } from './services/home.js';
+import { selectSetupBasket } from './services/setupBuilder.js';
 import { getUserModel } from './services/insights.js';
 import { describeProfile, getPriority, listPreferences, PRIORITIES, recordEvent, REJECT_REASONS, resetPreferences, setPreference, setPriority } from './services/preferences.js';
 import { getCachedProduct } from './services/channel3.js';
@@ -90,13 +91,24 @@ app.patch('/api/cart/items/:id', requireUser, wrap(async (req, res) => res.json(
 app.delete('/api/cart/items/:id', requireUser, wrap(async (req, res) => res.json(removeItem(req.userId, req.params.id))));
 app.delete('/api/cart', requireUser, (req, res) => { clearCart(req.userId); res.json(getCart(req.userId)); });
 
+// The shopper chose one of the setup baskets: it becomes their cart, and the choice teaches Buypal their style.
+app.post('/api/setups/select', requireUser, wrap(async (req, res) => {
+  const { items, strategy, goal, budget } = req.body || {};
+  const cart = selectSetupBasket(req.userId, { items, strategy, goal, budget });
+  if (strategy) recordEvent(req.userId, { type: 'select', strategy: String(strategy).split(' · ')[0], category: null });
+  res.json(cart);
+}));
+
 // ---- Feedback & preferences ----
 app.post('/api/feedback', requireUser, wrap(async (req, res) => {
   const { type, productId, strategy = null, reason = null, category = null } = req.body || {};
-  if (!['like', 'reject'].includes(type)) return res.status(400).json({ error: 'Unknown feedback type.' });
+  if (!['like', 'reject', 'bought', 'click'].includes(type)) return res.status(400).json({ error: 'Unknown feedback type.' });
   if (reason && !REJECT_REASONS[reason]) return res.status(400).json({ error: 'Unknown reason.' });
   const product = getCachedProduct(String(productId || ''))?.product;
-  recordEvent(req.userId, { type, product, strategy, reason, category });
+  // "bought" is self-reported by the shopper after buying at the retailer (Buypal cannot confirm it).
+  // "click" means the shopper opened the retailer page for this card, which counts as choosing it.
+  const eventType = { bought: 'purchase', click: 'select' }[type] || type;
+  recordEvent(req.userId, { type: eventType, product, strategy, reason: type === 'bought' ? 'self_reported' : reason, category });
   res.json({ ok: true, preferences: listPreferences(req.userId) });
 }));
 app.get('/api/preferences', requireUser, (req, res) => res.json({ preferences: listPreferences(req.userId), summary: describeProfile(req.userId) }));

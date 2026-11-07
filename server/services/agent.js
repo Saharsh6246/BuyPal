@@ -10,16 +10,17 @@ import { runTool, TOOL_DEFINITIONS } from './tools.js';
 
 const SYSTEM_PROMPT = `You are Buypal, a friendly, concise personal shopping assistant that can help with ANY everyday purchase: groceries, household items, electronics, personal care, stationery, gifts and more.
 How you work:
-- The user describes what they want in their own words, sometimes in detail. Understand it: the product, size/variant, brand, budget, and how soon they need it. Call find_products once per distinct item (for "milk and bread" call it twice). Put speed needs in delivery_within_minutes ("right now" = 15, "within an hour" = 60, "today" = 720).
-- find_products compares stores and returns baskets: best price, best quality, best overall and quickest delivery. The basket order is personalised by the shopper profile you receive: say in one sentence why this shopper sees these baskets (use why_these_baskets_for_this_shopper and shopper), then recommend ONE basket for their situation and why.
+- The user describes what they want in their own words, sometimes in detail. Understand it: the product, size/variant, brand and budget. Call find_products once per distinct item (for "milk and bread" call it twice).
+- find_products compares stores and returns up to five cards: best overall, best quality, best price, and when the data supports them most loved (top ratings), best deal (verified markdown) and picked for you (a brand the shopper likes). The order is personalised by the shopper profile you receive: say in one sentence why this shopper sees these cards (use why_these_baskets_for_this_shopper and shopper), then recommend ONE card for their situation and why.
 - Some listings come from a simulated demo store feed (demo_data = true). Always say so briefly when you recommend one of them, e.g. "(demo store data)". Never claim a demo listing is from Amazon, Flipkart, Blinkit or Zepto.
 Rules:
-- Use tools for anything about products, prices, delivery, carts or preferences. Never invent products, prices, ratings, specs, delivery times or availability.
+- Use tools for anything about products, prices, carts or preferences. Never invent products, prices, ratings, specs or availability. Buypal has no delivery-time data, so never promise or estimate delivery speed.
 - Only mention products returned by tools. Product cards with full details are shown to the user automatically, so keep replies short (under 100 words): say what you found, which basket suits their situation and why, and any caveat from tool notes.
 - If the user gives a budget in rupees pass currency "INR"; otherwise "USD". Mention that conversions are approximate when currency is INR.
 - Extract must_have (essential) vs nice_to_have (secondary) requirements from the message. Ask one short clarifying question only if you cannot tell what product they want.
-- For "build/complete setup" requests use build_setup. For changes to an existing cart use modify_cart. Never claim a total or change that a tool did not report.
-- You cannot take payment. When the user is ready, tell them to open the cart and press the PayPal checkout button, which asks for their explicit approval. This is a PayPal Sandbox demo: no real retailer order or delivery is created.
+- For "build/complete setup" requests use build_setup: it returns several complete baskets (best overall, best quality, best price), each within the budget. Pass priority_hint from the user's words (e.g. "high quality yet affordable" = balanced). Recommend one basket and say why. Buypal does not place orders at retailers: the shopper opens a basket and buys each part through the retailer links. For changes to an existing cart use modify_cart. Never claim a total or change that a tool did not report.
+- You cannot take payment or place orders. For setup baskets, tell the user to open the basket they like and buy each part at the retailer links (Amazon, Walmart, Best Buy and others); Buypal cannot order for them. A single item can also go through the PayPal Sandbox checkout, which is only a demo: no real retailer order or delivery is created. Never say a basket can be paid for with PayPal.
+- When you quote money, give the basket total and the budget separately, exactly as the tool reports them (do not call a total a budget). Mention rupee amounts only as approximate.
 - Do not describe Buypal as providing escrow or guaranteed delivery.`;
 
 const MAX_STEPS = 4;
@@ -42,6 +43,8 @@ function summarizeBlocks(blocks, plan, errors = []) {
       if (!block.cards.length) lines.push(block.notes[0] || 'I could not find matching products. Try a broader description or a higher budget.');
       else lines.push(`Here ${block.cards.length === 1 ? 'is' : 'are'} ${block.cards.length} pick${block.cards.length === 1 ? '' : 's'} for ${block.category || 'your search'}${block.budgetUsd ? ` within about ${fmtUsd(block.budgetUsd)}` : ''}: ${block.cards.map((c) => c.label).join(', ')}. Each card explains why it was chosen.`);
       if (block.notes.length && block.cards.length) lines.push(block.notes[0]);
+    } else if (block.type === 'setupBaskets') {
+      lines.push(`I built ${block.baskets.length} complete setup${block.baskets.length === 1 ? '' : 's'} within ${fmtUsd(block.budget)}: ${block.baskets.map((b) => `${b.label} (${fmtUsd(b.total)})`).join(', ')}. Open one to see where to buy each part.`);
     } else if (block.type === 'setup') {
       lines.push(`I built a ${block.cart.items.length}-item setup for ${fmtUsd(block.total)} against your ${fmtUsd(block.budget)} budget (${fmtUsd(block.budget - block.total)} left). You can ask me to swap or cut anything.`);
     } else if (block.type === 'cart') {
@@ -85,7 +88,7 @@ async function runWithRules(userId, text, blocks) {
     await runTool(ctx, 'find_products', plan);
   } else if (plan.type === 'setup') {
     if (!plan.budget) return { plan, text: 'What total budget should I keep the setup under? For example “under ₹1,00,000” or “under $1200”.' };
-    await runTool(ctx, 'build_setup', { goal: plan.goal, total_budget: plan.budget, currency: plan.currency });
+    await runTool(ctx, 'build_setup', { goal: plan.goal, total_budget: plan.budget, currency: plan.currency, priority_hint: plan.priority_hint });
   } else if (plan.type === 'cart') {
     await runTool(ctx, 'show_cart');
   } else if (plan.type === 'edit') {

@@ -8,9 +8,8 @@ export const PRIORITIES = {
   price: 'Lowest price that still meets your needs',
   quality: 'Best quality and performance',
   balanced: 'The best balance of price and quality',
-  speed: 'The fastest delivery',
 };
-const PRIORITY_STRATEGY = { price: 'Budget', quality: 'Premium', balanced: 'Smart', speed: 'Fastest' };
+const PRIORITY_STRATEGY = { price: 'Budget', quality: 'Premium', balanced: 'Smart' };
 
 export function getSetting(userId, key) {
   return get('SELECT value FROM user_settings WHERE user_id=? AND key=?', userId, key)?.value ?? null;
@@ -25,7 +24,7 @@ export function setPriority(userId, priority) {
   setSetting(userId, 'priority', priority);
 }
 const clamp = (value) => Math.max(-MAX, Math.min(MAX, value));
-export const STRATEGIES = ['Budget', 'Smart', 'Premium', 'Fastest'];
+export const STRATEGIES = ['Budget', 'Smart', 'Premium'];
 const normKey = (dimension, key) => (dimension === 'brand' ? String(key).trim().toLowerCase().slice(0, 80) : String(key).trim());
 
 export const REJECT_REASONS = {
@@ -92,7 +91,7 @@ export function listPreferences(userId) {
 export function getProfile(userId, category) {
   const rows = listPreferences(userId);
   const cat = category ? String(category).toLowerCase() : null;
-  const merged = { brand: {}, strategy: { Budget: 0, Smart: 0, Premium: 0, Fastest: 0 } };
+  const merged = { brand: {}, strategy: { Budget: 0, Smart: 0, Premium: 0 } };
   for (const row of rows) {
     const weight = row.scope === 'global' ? 0.5 : row.scope === cat ? 1 : 0;
     if (!weight) continue;
@@ -143,7 +142,7 @@ export function describeProfile(userId) {
   const profile = getProfile(userId, null);
   const lines = [];
   if (profile.priority) lines.push(`Your priority: ${PRIORITIES[profile.priority].toLowerCase()}.`);
-  if (profile.dominant) lines.push(`You usually pick ${{ Budget: 'Best price', Smart: 'Best overall', Premium: 'Best quality', Fastest: 'Quickest delivery' }[profile.dominant]} options, so those are shown first.`);
+  if (profile.dominant) lines.push(`You usually pick ${{ Budget: 'Best price', Smart: 'Best overall', Premium: 'Best quality' }[profile.dominant]} options, so those are shown first.`);
   if (profile.budgetSensitivity > 0.4) lines.push('You tend to prioritise saving money.');
   if (profile.budgetSensitivity < -0.4) lines.push('You tend to prioritise quality and performance.');
   const liked = Object.entries(profile.brand).filter(([, s]) => s >= 1).map(([b]) => b);

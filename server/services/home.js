@@ -8,7 +8,7 @@ import { buildRecommendations, filterCandidates, publicProduct } from './scoring
 // searched) and "deals" (verified discounts vs the listed regular price). All from real listings.
 
 const STARTER_CATEGORIES = ['milk', 'phone charger', 'headphones'];
-const PRIORITY_ROLE = { price: 'Budget', quality: 'Premium', balanced: 'Smart', speed: 'Fastest' };
+const PRIORITY_ROLE = { price: 'Budget', quality: 'Premium', balanced: 'Smart' };
 const TTL_MS = 10 * 60 * 1000;
 const cache = new Map();
 

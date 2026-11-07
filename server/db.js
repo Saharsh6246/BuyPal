@@ -94,6 +94,12 @@ CREATE TABLE IF NOT EXISTS search_history (
   budget_usd REAL,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+CREATE TABLE IF NOT EXISTS provider_usage (
+  provider TEXT NOT NULL,
+  month TEXT NOT NULL,
+  calls INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (provider, month)
+);
 CREATE TABLE IF NOT EXISTS llm_usage (
   day TEXT PRIMARY KEY,
   calls INTEGER NOT NULL DEFAULT 0

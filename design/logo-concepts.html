@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Buypal logo concepts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Outfit:wght@400;500;600&family=Cormorant+Garamond:wght@500;600;700&family=Hanken+Grotesk:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root { --navy:#0a1f4d; --azure:#1d63e8; --sky:#58aefc; --gold:#c9a24d; --ivory:#f7f4ec; --ink:#0b1020; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: #eceae4; color: var(--ink); font-family: "Hanken Grotesk", system-ui, sans-serif; padding: 40px 28px 64px; }
+  h1 { font: 600 34px/1.1 "Cormorant Garamond", Georgia, serif; margin: 0 0 6px; }
+  .sub { color: #5d5a50; margin: 0 0 32px; max-width: 760px; line-height: 1.5; }
+  .grid { display: grid; gap: 22px; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); max-width: 1180px; }
+  .card { background: #fff; border: 1px solid #dcd8cc; padding: 22px; }
+  .tag { font: 600 11px/1 "Hanken Grotesk"; letter-spacing: .2em; text-transform: uppercase; color: #8a6d2f; }
+  .name { font: 600 26px/1.1 "Cormorant Garamond", serif; margin: 8px 0 4px; }
+  .note { color: #5d5a50; font-size: 13.5px; line-height: 1.5; min-height: 84px; }
+  .stage { display: flex; align-items: center; justify-content: center; height: 150px; margin: 16px 0 0; border: 1px solid #ebe8de; }
+  .dark { background: var(--navy); border-color: var(--navy); }
+  .row { display: flex; gap: 10px; margin-top: 10px; }
+  .row .stage { flex: 1; height: 92px; margin: 0; }
+  .sw { display: flex; gap: 6px; margin-top: 14px; }
+  .sw i { flex: 1; height: 26px; border: 1px solid rgba(0,0,0,.08); }
+  .lockup { display: flex; align-items: center; gap: 14px; }
+  .word-a { font: 700 38px/1 "Sora", sans-serif; letter-spacing: -.02em; color: var(--navy); }
+  .word-a b { color: var(--azure); font-weight: 700; }
+  .word-b { font: 500 44px/1 "Outfit", sans-serif; letter-spacing: -.03em; color: var(--navy); }
+  .word-b b { color: var(--azure); font-weight: 600; }
+  .word-c { font: 600 42px/1 "Cormorant Garamond", serif; letter-spacing: .01em; color: var(--navy); }
+  .word-c b { color: var(--gold); font-weight: 600; font-style: italic; }
+  .on-dark .word-a, .on-dark .word-b, .on-dark .word-c { color: #fff; }
+  .on-dark .word-a b, .on-dark .word-b b { color: var(--sky); }
+  .small .word-a, .small .word-b, .small .word-c { font-size: 22px; }
+</style>
+</head>
+<body>
+<h1>Buypal: logo concepts</h1>
+<p class="sub">Three directions for the mark. Each is shown on light and on navy, as an app icon, and at favicon size, with the palette it would lead to. Nothing here copies PayPal's own logo; the family resemblance is only the navy and azure.</p>
+
+<div class="grid">
+
+  <!-- A -->
+  <section class="card">
+    <p class="tag">Concept A</p>
+    <h2 class="name">The Seal</h2>
+    <p class="note">A navy disc with a fine gold ring and a white B whose lower counter is a check mark: a "verified purchase" seal. Reads as trust and finance at a glance. Two-tone wordmark (Buy navy, Pal azure) echoes the way PayPal is set.</p>
+    <div class="stage">
+      <div class="lockup">
+        <svg width="84" height="84" viewBox="0 0 100 100" aria-label="Buypal seal">
+          <defs><linearGradient id="gA" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#14367f"/><stop offset="1" stop-color="#071634"/></linearGradient></defs>
+          <circle cx="50" cy="50" r="48" fill="url(#gA)"/>
+          <circle cx="50" cy="50" r="44" fill="none" stroke="#c9a24d" stroke-width="1.6"/>
+          <path fill="#fff" fill-rule="evenodd" d="M33 24h20.5c8.4 0 14.5 5.6 14.5 13 0 4.6-2.4 8.4-6.2 10.3 5.2 1.7 8.7 6.2 8.7 12.2 0 8.8-7 15.5-16.8 15.5H33z M44 33v10.5h8.2c3.2 0 5.3-2.1 5.3-5.2S55.4 33 52.2 33z"/>
+          <path fill="none" stroke="#c9a24d" stroke-width="5.2" stroke-linecap="round" stroke-linejoin="round" d="M46.5 62.5l5.6 5.8 10-11.8"/>
+        </svg>
+        <span class="word-a">Buy<b>Pal</b></span>
+      </div>
+    </div>
+    <div class="stage dark on-dark">
+      <div class="lockup">
+        <svg width="84" height="84" viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="48" fill="#fff"/>
+          <circle cx="50" cy="50" r="44" fill="none" stroke="#c9a24d" stroke-width="1.6"/>
+          <path fill="#0a1f4d" fill-rule="evenodd" d="M33 24h20.5c8.4 0 14.5 5.6 14.5 13 0 4.6-2.4 8.4-6.2 10.3 5.2 1.7 8.7 6.2 8.7 12.2 0 8.8-7 15.5-16.8 15.5H33z M44 33v10.5h8.2c3.2 0 5.3-2.1 5.3-5.2S55.4 33 52.2 33z"/>
+          <path fill="none" stroke="#c9a24d" stroke-width="5.2" stroke-linecap="round" stroke-linejoin="round" d="M46.5 62.5l5.6 5.8 10-11.8"/>
+        </svg>
+        <span class="word-a">Buy<b>Pal</b></span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="stage"><svg width="64" height="64" viewBox="0 0 100 100"><rect width="100" height="100" rx="22" fill="#0a1f4d"/><circle cx="50" cy="50" r="38" fill="none" stroke="#c9a24d" stroke-width="1.6"/><path fill="#fff" fill-rule="evenodd" d="M36 29h17.5c7.2 0 12.4 4.8 12.4 11.1 0 3.9-2 7.2-5.3 8.9 4.5 1.4 7.5 5.3 7.5 10.4 0 7.5-6 13.3-14.4 13.3H36z M45.4 36.8v9h7c2.7 0 4.5-1.800 4.500-4.500S55.100 36.800 52.400 36.800z"/><path fill="none" stroke="#c9a24d" stroke-width="4.4" stroke-linecap="round" stroke-linejoin="round" d="M49 60l4.700 5 8.500-10"/></svg></div>
+      <div class="stage"><svg width="16" height="16" viewBox="0 0 100 100"><circle cx="50" cy="50" r="48" fill="#0a1f4d"/><path fill="#fff" fill-rule="evenodd" d="M33 24h20.5c8.4 0 14.5 5.6 14.5 13 0 4.6-2.4 8.4-6.2 10.3 5.2 1.7 8.7 6.2 8.7 12.2 0 8.8-7 15.5-16.8 15.5H33z M44 33v10.5h8.2c3.2 0 5.3-2.1 5.3-5.2S55.4 33 52.2 33z"/></svg><svg width="32" height="32" viewBox="0 0 100 100" style="margin-left:10px"><circle cx="50" cy="50" r="48" fill="#0a1f4d"/><path fill="#fff" fill-rule="evenodd" d="M33 24h20.5c8.4 0 14.5 5.6 14.5 13 0 4.6-2.4 8.4-6.2 10.3 5.2 1.7 8.7 6.2 8.7 12.2 0 8.8-7 15.5-16.8 15.5H33z M44 33v10.5h8.2c3.2 0 5.3-2.1 5.3-5.2S55.4 33 52.2 33z"/></svg></div>
+    </div>
+    <div class="sw"><i style="background:#0a1f4d"></i><i style="background:#1d63e8"></i><i style="background:#c9a24d"></i><i style="background:#f7f4ec"></i><i style="background:#0b1020"></i></div>
+  </section>
+
+  <!-- B -->
+  <section class="card">
+    <p class="tag">Concept B</p>
+    <h2 class="name">The Bag &amp; Check</h2>
+    <p class="note">A rounded shopping bag in PayPal-family azure with a navy handle and a white check: buying, done. The most literal and friendly of the three, and the one that looks most like a modern payments app. Lower-case wordmark in a clean geometric sans.</p>
+    <div class="stage">
+      <div class="lockup">
+        <svg width="76" height="76" viewBox="0 0 100 100" aria-label="Buypal bag">
+          <defs><linearGradient id="gB" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#2f7bff"/><stop offset="1" stop-color="#0f4fd1"/></linearGradient></defs>
+          <path d="M34 36V29a16 16 0 0 1 32 0v7" fill="none" stroke="#0a1f4d" stroke-width="7" stroke-linecap="round"/>
+          <path d="M20 38h60a4 4 0 0 1 4 4.400l-4.200 40a8 8 0 0 1-8 7.100H28.200a8 8 0 0 1-8-7.100L16 42.400A4 4 0 0 1 20 38z" fill="url(#gB)"/>
+          <path d="M36 62l9 9 19-20" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="word-b">buy<b>pal</b></span>
+      </div>
+    </div>
+    <div class="stage dark on-dark">
+      <div class="lockup">
+        <svg width="76" height="76" viewBox="0 0 100 100">
+          <path d="M34 36V29a16 16 0 0 1 32 0v7" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round"/>
+          <path d="M20 38h60a4 4 0 0 1 4 4.400l-4.200 40a8 8 0 0 1-8 7.100H28.200a8 8 0 0 1-8-7.100L16 42.400A4 4 0 0 1 20 38z" fill="#58aefc"/>
+          <path d="M36 62l9 9 19-20" fill="none" stroke="#0a1f4d" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="word-b">buy<b>pal</b></span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="stage"><svg width="64" height="64" viewBox="0 0 100 100"><rect width="100" height="100" rx="22" fill="#1d63e8"/><path d="M36 38V32a14 14 0 0 1 28 0v6" fill="none" stroke="#fff" stroke-width="6" stroke-linecap="round" transform="translate(0 2)"/><path d="M24 40h52a3 3 0 0 1 3 3.300l-3.700 33a7 7 0 0 1-7 6.200H31.700a7 7 0 0 1-7-6.200L21 43.300A3 3 0 0 1 24 40z" fill="#fff"/><path d="M38 62l8 8 16-17" fill="none" stroke="#1d63e8" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="stage"><svg width="16" height="16" viewBox="0 0 100 100"><path d="M34 36V29a16 16 0 0 1 32 0v7" fill="none" stroke="#0a1f4d" stroke-width="9" stroke-linecap="round"/><path d="M20 38h60a4 4 0 0 1 4 4.400l-4.200 40a8 8 0 0 1-8 7.100H28.200a8 8 0 0 1-8-7.100L16 42.400A4 4 0 0 1 20 38z" fill="#1d63e8"/><path d="M36 62l9 9 19-20" fill="none" stroke="#fff" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/></svg><svg width="32" height="32" viewBox="0 0 100 100" style="margin-left:10px"><path d="M34 36V29a16 16 0 0 1 32 0v7" fill="none" stroke="#0a1f4d" stroke-width="8" stroke-linecap="round"/><path d="M20 38h60a4 4 0 0 1 4 4.400l-4.200 40a8 8 0 0 1-8 7.100H28.200a8 8 0 0 1-8-7.100L16 42.400A4 4 0 0 1 20 38z" fill="#1d63e8"/><path d="M36 62l9 9 19-20" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+    </div>
+    <div class="sw"><i style="background:#0a1f4d"></i><i style="background:#1d63e8"></i><i style="background:#58aefc"></i><i style="background:#f4f8ff"></i><i style="background:#0b1020"></i></div>
+  </section>
+
+  <!-- C -->
+  <section class="card">
+    <p class="tag">Concept C</p>
+    <h2 class="name">The Coin &amp; Companion</h2>
+    <p class="note">An abstract lower-case "b": a tall stem (the "pal", a person) holding a ring (the coin / the payment) with a gold spark. Quiet, editorial and the most premium and least generic of the three, set with a refined serif wordmark and a gold italic "pal". It fits the ivory-and-ink editorial look we already have.</p>
+    <div class="stage">
+      <div class="lockup">
+        <svg width="76" height="76" viewBox="0 0 100 100" aria-label="Buypal b">
+          <rect x="20" y="14" width="11" height="70" rx="5.500" fill="#0a1f4d"/>
+          <circle cx="55" cy="60" r="22" fill="none" stroke="#0a1f4d" stroke-width="11"/>
+          <circle cx="55" cy="60" r="22" fill="none" stroke="#c9a24d" stroke-width="2.200" stroke-dasharray="0 138.200" />
+          <circle cx="74" cy="30" r="6.500" fill="#c9a24d"/>
+        </svg>
+        <span class="word-c">Buy<b>pal</b></span>
+      </div>
+    </div>
+    <div class="stage dark on-dark">
+      <div class="lockup">
+        <svg width="76" height="76" viewBox="0 0 100 100">
+          <rect x="20" y="14" width="11" height="70" rx="5.500" fill="#fff"/>
+          <circle cx="55" cy="60" r="22" fill="none" stroke="#fff" stroke-width="11"/>
+          <circle cx="74" cy="30" r="6.500" fill="#c9a24d"/>
+        </svg>
+        <span class="word-c">Buy<b>pal</b></span>
+      </div>
+    </div>
+    <div class="row">
+      <div class="stage"><svg width="64" height="64" viewBox="0 0 100 100"><rect width="100" height="100" rx="22" fill="#0a1f4d"/><rect x="28" y="22" width="9" height="58" rx="4.500" fill="#fff"/><circle cx="55" cy="61" r="18" fill="none" stroke="#fff" stroke-width="9"/><circle cx="72" cy="34" r="5.500" fill="#c9a24d"/></svg></div>
+      <div class="stage"><svg width="16" height="16" viewBox="0 0 100 100"><rect width="100" height="100" rx="22" fill="#0a1f4d"/><rect x="26" y="18" width="12" height="64" rx="6" fill="#fff"/><circle cx="56" cy="62" r="19" fill="none" stroke="#fff" stroke-width="12"/><circle cx="74" cy="32" r="7" fill="#c9a24d"/></svg><svg width="32" height="32" viewBox="0 0 100 100" style="margin-left:10px"><rect width="100" height="100" rx="22" fill="#0a1f4d"/><rect x="26" y="18" width="11" height="64" rx="5.500" fill="#fff"/><circle cx="56" cy="62" r="19" fill="none" stroke="#fff" stroke-width="11"/><circle cx="74" cy="32" r="6.500" fill="#c9a24d"/></svg></div>
+    </div>
+    <div class="sw"><i style="background:#0a1f4d"></i><i style="background:#c9a24d"></i><i style="background:#f7f4ec"></i><i style="background:#1d63e8"></i><i style="background:#0b1020"></i></div>
+  </section>
+
+</div>
+</body>
+</html>

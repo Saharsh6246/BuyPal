@@ -2,17 +2,16 @@ const OPTIONS = [
   { key: 'price', title: 'Lowest price', note: 'The cheapest option that still meets your needs.' },
   { key: 'quality', title: 'Best quality', note: 'Performance, build and reviews come first.' },
   { key: 'balanced', title: 'Best balance', note: 'The most value for what you pay.' },
-  { key: 'speed', title: 'Fastest delivery', note: 'Get it as soon as possible, from whichever store is quickest.' },
 ];
 
 /** First-visit choice (cards) and the compact switcher (segmented). */
 export default function PriorityPicker({ value, onChange, variant = 'cards' }) {
   if (variant === 'segmented') {
     return (
-      <div role="radiogroup" aria-label="What matters most to you" className="inline-flex border border-rule bg-paper">
+      <div role="radiogroup" aria-label="What matters most to you" className="inline-flex rounded-xl border border-rule-strong bg-paper p-1">
         {OPTIONS.map((o) => (
           <button key={o.key} type="button" role="radio" aria-checked={value === o.key} onClick={() => onChange(o.key)}
-            className={`px-4 py-2 text-[11.5px] font-semibold uppercase tracking-[0.12em] transition ${value === o.key ? 'bg-ink text-canvas' : 'text-muted hover:text-ink'}`}>
+            className={`rounded-lg px-4 py-1.5 text-[13px] font-semibold transition ${value === o.key ? 'bg-navy text-white' : 'text-muted hover:text-navy'}`}>
             {o.title}
           </button>
         ))}
@@ -20,15 +19,22 @@ export default function PriorityPicker({ value, onChange, variant = 'cards' }) {
     );
   }
   return (
-    <div role="radiogroup" aria-label="What matters most to you" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-      {OPTIONS.map((o, i) => (
-        <button key={o.key} type="button" role="radio" aria-checked={value === o.key} onClick={() => onChange(o.key)}
-          className={`border bg-paper p-5 text-left transition hover:border-ink ${value === o.key ? 'border-ink' : 'border-rule'}`}>
-          <span className="eyebrow">No. {i + 1}</span>
-          <span className="serif mt-1 block text-2xl font-semibold">{o.title}</span>
-          <span className="mt-1 block text-[13px] leading-snug text-muted">{o.note}</span>
-        </button>
-      ))}
+    <div role="radiogroup" aria-label="What matters most to you" className="grid gap-3 sm:grid-cols-3">
+      {OPTIONS.map((o) => {
+        const selected = value === o.key;
+        return (
+          <button key={o.key} type="button" role="radio" aria-checked={selected} onClick={() => onChange(o.key)}
+            className={`card flex items-start gap-3 p-4 text-left transition hover:border-azure ${selected ? '!border-azure ring-2 ring-azure/20' : ''}`}>
+            <span className={`mt-0.5 flex h-5 w-5 flex-none items-center justify-center rounded-full border-2 ${selected ? 'border-azure' : 'border-rule-strong'}`}>
+              {selected && <span className="h-2.5 w-2.5 rounded-full bg-azure" />}
+            </span>
+            <span>
+              <span className="display block text-lg font-semibold text-navy">{o.title}</span>
+              <span className="mt-0.5 block text-[13px] leading-snug text-muted">{o.note}</span>
+            </span>
+          </button>
+        );
+      })}
     </div>
   );
 }

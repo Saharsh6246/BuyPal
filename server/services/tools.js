@@ -5,7 +5,7 @@ import { userModelForLlm } from './insights.js';
 import { recordSearch } from './interests.js';
 import { setPreference } from './preferences.js';
 import { findProducts, normalizeRequirements } from './recommend.js';
-import { buildSetup, findCartItem, reduceCartTotal, replaceCartItem } from './setupBuilder.js';
+import { buildSetupBaskets, findCartItem, reduceCartTotal, replaceCartItem } from './setupBuilder.js';
 
 // The tools the LLM may call. Note what is NOT here: there is deliberately no payment tool.
 // Only the signed-in user, pressing the checkout button and approving in PayPal, can pay.
@@ -18,13 +18,12 @@ export const TOOL_DEFINITIONS = [
     type: 'function',
     function: {
       name: 'find_products',
-      description: 'Compare listings across online stores for ANY product (groceries, household, electronics, personal care, stationery...) and return baskets scored by Buypal: best price, best quality, best overall and quickest delivery. Call once per distinct item the user wants.',
+      description: 'Compare listings across online stores for ANY product (groceries, household, electronics, personal care, stationery...) and return cards scored by Buypal: best overall, best quality, best price, most loved, best deal and picked for you. Call once per distinct item the user wants.',
       parameters: {
         type: 'object',
         properties: {
           category: str('Short singular noun for the product type, e.g. butter, phone charger, notebook, laptop'),
           search_query: str("A concise search phrase capturing the user's detailed description: brand, size, variant (e.g. 'salted butter 500g')"),
-          delivery_within_minutes: { type: 'number', description: 'If the user needs it quickly: the maximum delivery time in minutes (e.g. 30 for "within 30 minutes", 15 for "instantly/now")' },
           must_have: strList("Essential requirements, short phrases, e.g. wireless, organic, 500 g (always include a stated pack size like '500 g' or '1 litre'), 16gb ram, 4k"),
           nice_to_have: strList('Secondary preferences, e.g. lightweight, long battery, rgb'),
           budget_max: { type: 'number', description: 'Maximum price the user stated, in their currency' },
@@ -41,13 +40,14 @@ export const TOOL_DEFINITIONS = [
     type: 'function',
     function: {
       name: 'build_setup',
-      description: 'Build a complete multi-product cart (e.g. a gaming setup) within a total budget. Replaces the current cart.',
+      description: 'Build several COMPLETE multi-product setups (baskets: best overall, best quality, best price) for one goal within a total budget, e.g. a gaming setup. The shopper picks a basket and buys each part at the retailer links. Does not change the cart.',
       parameters: {
         type: 'object',
         properties: {
           goal: str('What the setup is for, e.g. complete gaming setup'),
           total_budget: { type: 'number', description: 'Total budget in the user currency' },
           currency: str('USD or INR'),
+          priority_hint: { type: 'string', enum: ['price', 'quality', 'balanced'], description: 'What the user emphasised in words: "cheap/affordable"=price, "high quality"=quality, "quality yet affordable"=balanced' },
           components: {
             type: 'array',
             description: 'Optional list of parts. Omit to use a sensible template for gaming, office or study setups.',
@@ -102,7 +102,7 @@ export const TOOL_DEFINITIONS = [
 const compactCard = (card) => ({
   strategy: card.label, product_id: card.product.id, name: card.product.name, brand: card.product.brand,
   price_usd: card.product.price, rating: card.product.rating ? `${card.product.rating.value}/5 (${card.product.rating.count})` : 'not listed',
-  store: card.product.merchant, delivery: card.product.delivery ? card.product.delivery.label : 'not reported',
+  store: card.product.merchant,
   demo_data: Boolean(card.product.demo),
   specs: card.product.specChips.slice(0, 4), why: card.position, pros: card.pros, cons: card.cons,
 });
@@ -133,17 +133,29 @@ async function runToolInner(ctx, name, args) {
       if (!req.category && !req.query) return { result: { error: 'A product category is required.' } };
       const outcome = await findProducts(userId, req);
       recordSearch(userId, { query: args.search_query || [...req.mustHave, req.category].join(' '), category: req.category, budgetUsd: req.budgetMax });
-      blocks.push({ type: 'recommendations', category: req.category, budgetUsd: req.budgetMax, maxDeliveryMinutes: req.maxDeliveryMinutes, requirements: { mustHave: req.mustHave, niceToHave: req.niceToHave }, cards: outcome.cards, notes: outcome.notes, stats: outcome.stats, cheapest: outcome.cheapest || null, profileUsed: outcome.profileUsed, basketPlan: outcome.basketPlan || null });
+      blocks.push({ type: 'recommendations', category: req.category, budgetUsd: req.budgetMax, requirements: { mustHave: req.mustHave, niceToHave: req.niceToHave }, cards: outcome.cards, notes: outcome.notes, stats: outcome.stats, cheapest: outcome.cheapest || null, profileUsed: outcome.profileUsed, basketPlan: outcome.basketPlan || null });
       return { result: { found: outcome.stats.found, considered: outcome.stats.considered, notes: outcome.notes, baskets: outcome.cards.map(compactCard), why_these_baskets_for_this_shopper: outcome.basketPlan?.lines, shopper: userModelForLlm(userId), cheapest_available: outcome.cheapest ? { name: outcome.cheapest.name, price_usd: outcome.cheapest.price } : undefined } };
     }
 
     if (name === 'build_setup') {
       const budgetUsd = toUsdOrNull(args.total_budget, args.currency);
       if (!budgetUsd) return { result: { error: 'A total budget in USD or INR is needed.' } };
-      const outcome = await buildSetup(userId, { goal: args.goal, budgetUsd, components: args.components });
+      const outcome = await buildSetupBaskets(userId, { goal: args.goal, budgetUsd, components: args.components, hint: args.priority_hint });
       if (outcome.error) return { result: { error: outcome.error } };
-      blocks.push({ type: 'setup', cart: outcome.cart, reasons: Object.fromEntries(outcome.items.map((i) => [i.productId, i.reason])), notes: outcome.notes, budget: outcome.budget, total: outcome.total, withinBudget: outcome.withinBudget, converted: String(args.currency || 'USD').toUpperCase() !== 'USD' });
-      return { result: { total_usd: outcome.total, budget_usd: outcome.budget, within_budget: outcome.withinBudget, items: outcome.cart.items.map((i) => ({ part: i.role, name: i.product.name, price_usd: i.product.price, qty: i.quantity, reason: outcome.items.find((x) => x.productId === i.id)?.reason })), notes: outcome.notes } };
+      blocks.push({ type: 'setupBaskets', goal: outcome.goal, budget: outcome.budget, baskets: outcome.baskets, notes: outcome.notes, plan: outcome.plan, converted: String(args.currency || 'USD').toUpperCase() !== 'USD' });
+      return {
+        result: {
+          budget_usd: outcome.budget,
+          baskets: outcome.baskets.map((b) => ({
+            basket: b.label, total_usd: b.total, within_budget: b.withinBudget,
+            parts: b.items.map((i) => ({ part: i.role, name: i.product.name, store: i.product.merchant, price_usd: i.product.price, demo_data: Boolean(i.product.demo) })),
+          })),
+          why_these_baskets_for_this_shopper: outcome.plan.lines,
+          shopper: userModelForLlm(userId),
+          notes: outcome.notes,
+          reminder: 'The shopper opens a basket and buys each part at the retailer link. Buypal cannot place orders at Amazon or Walmart.',
+        },
+      };
     }
 
     if (name === 'show_cart') {

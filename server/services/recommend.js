@@ -25,7 +25,6 @@ export function normalizeRequirements(args = {}) {
     preferredBrands: list(args.preferred_brands),
     excludedBrands: list(args.excluded_brands),
     allowOverBudget: Boolean(args.allow_over_budget),
-    maxDeliveryMinutes: Number(args.delivery_within_minutes) > 0 ? Math.min(10080, Math.round(Number(args.delivery_within_minutes))) : null,
     gaming: mustHave.includes('gaming') || list(args.nice_to_have).includes('gaming'),
     budgetNote,
   };

@@ -75,7 +75,6 @@ export function normalizeProduct(raw) {
     source: 'Channel3',
     demo: false,
     groupId: String(raw.id),
-    delivery: null, // Channel3 does not provide delivery times, so none are claimed.
   };
 }
 

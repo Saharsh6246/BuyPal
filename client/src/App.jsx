@@ -1,17 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { api, setInrRate } from './api.js';
+import BasketDrawer from './components/BasketDrawer.jsx';
 import { CartBlock, Recommendations } from './components/Blocks.jsx';
 import CartDrawer from './components/CartDrawer.jsx';
+import Header from './components/Header.jsx';
 import Home from './components/Home.jsx';
+import { LogoMark } from './components/Logo.jsx';
 import ProfileDrawer from './components/ProfileDrawer.jsx';
+import SetupBaskets from './components/SetupBaskets.jsx';
 
 const EMPTY_CART = { items: [], count: 0, total: 0, budget: null, currency: 'USD' };
 
 function Typing() {
   return (
-    <div className="flex items-center gap-1.5 py-2" aria-label="Buypal is looking">
-      {[0, 1, 2].map((i) => <span key={i} className="h-1.5 w-1.5 animate-bounce bg-brass" style={{ animationDelay: `${i * 0.15}s` }} />)}
-      <span className="ml-2 text-xs italic text-muted">Comparing listings…</span>
+    <div className="flex items-center gap-3 text-sm text-muted" aria-label="Buypal is comparing stores">
+      <LogoMark size={28} />
+      <span className="flex items-center gap-1.5">
+        {[0, 1, 2].map((i) => <span key={i} className="h-1.5 w-1.5 animate-bounce rounded-full bg-azure" style={{ animationDelay: `${i * 0.15}s` }} />)}
+        <span className="ml-2">Comparing stores…</span>
+      </span>
     </div>
   );
 }
@@ -27,7 +34,7 @@ export default function App() {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [drawer, setDrawer] = useState(null);
-  const [checkoutSignal, setCheckoutSignal] = useState(0);
+  const [basketView, setBasketView] = useState(null);
   const [error, setError] = useState('');
   const bottomRef = useRef(null);
 
@@ -72,48 +79,37 @@ export default function App() {
     setPriority(value);
     try { await api.setPriority(value); setHome(null); if (showingHome) loadHome(); } catch (e) { setError(e.message); }
   };
-
-  const buyNow = () => { setDrawer('cart'); setCheckoutSignal((n) => n + 1); };
-  const newChat = async () => { await api.clearHistory(); setMessages([]); setHome(null); };
+  const startOver = async () => { await api.clearHistory(); setMessages([]); setHome(null); };
   const cartIds = useMemo(() => new Set(cart.items.map((i) => i.id)), [cart]);
-  const ai = config?.ai;
 
   return (
     <div className="flex h-full flex-col">
-      <header className="border-b border-ink bg-canvas">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-4 sm:px-6">
-          <button type="button" onClick={newChat} className="serif text-[34px] font-semibold leading-none tracking-tight" aria-label="Buypal, start over">Buypal</button>
-          <nav className="flex items-center gap-5 text-[11.5px] font-semibold uppercase tracking-[0.14em]">
-            {ai && <span className="hidden font-medium normal-case tracking-normal text-muted md:inline" title="Buypal stops calling the AI model at this daily limit, so it can never bill you.">{ai.enabled ? `AI ${ai.calls}/${ai.limit} today` : 'Basic mode'}</span>}
-            {!showingHome && <button type="button" onClick={newChat} className="text-muted hover:text-ink">Home</button>}
-            <button type="button" onClick={() => setDrawer('profile')} className="text-muted hover:text-ink">Profile</button>
-            <button type="button" onClick={() => setDrawer('cart')} className="hover:text-bottle">Cart{cart.count > 0 && <span className="ml-1.5 bg-ink px-1.5 py-0.5 text-[10px] text-canvas">{cart.count}</span>}</button>
-          </nav>
-        </div>
-        <div className="border-t border-rule" />
-      </header>
+      <Header ai={config?.ai} cartCount={cart.count} showHome={showingHome} onHome={startOver} onProfile={() => setDrawer('profile')} onCart={() => setDrawer('cart')} />
 
       <main className="scroll-thin flex-1 overflow-y-auto">
         {showingHome ? (
-          <Home home={home} loading={homeLoading} priority={priority} onPriority={choosePriority} cartIds={cartIds} onCart={setCart}
-            onSearch={send} rejectReasons={config?.rejectReasons} />
+          <Home home={home} loading={homeLoading} priority={priority} onPriority={choosePriority} cartIds={cartIds} onCart={setCart} onSearch={send} />
         ) : (
-          <div className="mx-auto w-full max-w-6xl px-4 pb-8 pt-8 sm:px-6">
+          <div className="mx-auto w-full max-w-7xl px-4 pb-8 pt-8 sm:px-6">
             <div className="space-y-8">
               {messages.map((m, index) => (
                 <div key={index} className={m.role === 'user' ? 'flex justify-end' : ''}>
                   {m.role === 'user' ? (
-                    <p className="serif max-w-[85%] border border-rule bg-paper px-4 py-2.5 text-[19px] italic animate-rise">{m.content}</p>
+                    <p className="max-w-[85%] rounded-2xl rounded-br-md bg-navy px-4 py-2.5 text-[15px] text-white animate-rise sm:max-w-xl">{m.content}</p>
                   ) : (
-                    <div className="animate-rise">
-                      <div className="max-w-2xl border-l-2 border-brass pl-4 text-[15.5px] leading-relaxed">{m.content}</div>
-                      {m.notice && <p className="mt-2 max-w-2xl pl-4 text-xs italic text-muted">{m.notice}</p>}
-                      {m.blocks?.map((block, i) => {
-                        if (block.type === 'recommendations') return <Recommendations key={i} block={block} cartIds={cartIds} onCart={setCart} onBuyNow={buyNow} rejectReasons={config?.rejectReasons} />;
-                        if (block.type === 'setup') return <CartBlock key={i} block={block} title="Your proposed setup" onOpenCart={() => setDrawer('cart')} />;
-                        if (block.type === 'cart') return <CartBlock key={i} block={block} onOpenCart={() => setDrawer('cart')} />;
-                        return null;
-                      })}
+                    <div className="flex gap-3 animate-rise">
+                      <div className="mt-0.5"><LogoMark size={28} /></div>
+                      <div className="min-w-0 flex-1">
+                        <div className="card max-w-3xl px-4 py-3 text-[15px] leading-relaxed">{m.content}</div>
+                        {m.notice && <p className="mt-2 max-w-3xl text-xs text-muted">{m.notice}</p>}
+                        {m.blocks?.map((block, i) => {
+                          if (block.type === 'recommendations') return <Recommendations key={i} block={block} cartIds={cartIds} onCart={setCart} rejectReasons={config?.rejectReasons} />;
+                          if (block.type === 'setupBaskets') return <SetupBaskets key={i} block={block} onOpen={(basket) => setBasketView({ basket, block })} onUseAsCart={(c) => { setCart(c); setDrawer('cart'); }} />;
+                          if (block.type === 'setup') return <CartBlock key={i} block={block} title="Your proposed setup" onOpenCart={() => setDrawer('cart')} />;
+                          if (block.type === 'cart') return <CartBlock key={i} block={block} onOpenCart={() => setDrawer('cart')} />;
+                          return null;
+                        })}
+                      </div>
                     </div>
                   )}
                 </div>
@@ -125,25 +121,26 @@ export default function App() {
         )}
       </main>
 
-      {(!showingHome || loading) && (
-        <footer className="border-t border-rule bg-canvas px-4 py-3 sm:px-6">
+      {!showingHome && (
+        <footer className="border-t border-rule bg-paper px-4 py-3 sm:px-6">
           <div className="mx-auto max-w-3xl">
-            {error && <p className="mb-2 border-l-2 border-wine bg-paper px-3 py-2 text-xs text-wine" role="alert">{error}</p>}
+            {error && <p className="mb-2 rounded-lg border border-danger/30 bg-danger/5 px-3 py-2 text-xs text-danger" role="alert">{error}</p>}
             <form onSubmit={(e) => { e.preventDefault(); send(input); }} className="field flex items-end gap-2 p-1.5">
               <label htmlFor="chat-input" className="sr-only">Message Buypal</label>
               <textarea id="chat-input" rows={1} value={input} onChange={(e) => setInput(e.target.value)} maxLength={1000}
                 onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(input); } }}
-                placeholder="Refine, ask a question, or search for something else"
-                className="max-h-32 min-h-[44px] flex-1 resize-none bg-transparent px-3 py-3 text-[15px] outline-none placeholder:text-muted/70" />
-              <button type="submit" disabled={loading || input.trim().length < 2} className="btn btn-primary">Send</button>
+                placeholder="Ask a follow-up or search again"
+                className="max-h-32 min-h-[44px] flex-1 resize-none overflow-hidden bg-transparent px-3 py-3 text-[15px] outline-none placeholder:text-muted/70" />
+              <button type="submit" disabled={loading || input.trim().length < 2} className="btn btn-primary !py-3">Send</button>
             </form>
             <p className="mt-1.5 text-center text-[11px] text-muted">Buypal shows only what listings state. Prices and availability can change at the retailer.</p>
           </div>
         </footer>
       )}
-      {showingHome && error && <p className="fixed bottom-4 left-1/2 -translate-x-1/2 border-l-2 border-wine bg-paper px-4 py-2 text-xs text-wine" role="alert">{error}</p>}
+      {showingHome && error && <p className="fixed bottom-4 left-1/2 -translate-x-1/2 rounded-lg border border-danger/30 bg-paper px-4 py-2 text-xs text-danger shadow" role="alert">{error}</p>}
 
-      <CartDrawer open={drawer === 'cart'} onClose={() => setDrawer(null)} cart={cart} setCart={setCart} orders={orders} refreshOrders={refreshOrders} checkoutSignal={checkoutSignal} />
+      <CartDrawer open={drawer === 'cart'} onClose={() => setDrawer(null)} cart={cart} setCart={setCart} orders={orders} refreshOrders={refreshOrders} />
+      <BasketDrawer view={basketView} onClose={() => setBasketView(null)} />
       <ProfileDrawer open={drawer === 'profile'} onClose={() => setDrawer(null)} priority={priority} onPriority={choosePriority} onReset={() => setHome(null)} />
     </div>
   );

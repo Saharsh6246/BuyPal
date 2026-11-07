@@ -1,33 +1,27 @@
 import { useState } from 'react';
 import { api, inr, money } from '../api.js';
+import { bucketOf } from '../buckets.js';
+import { IconCheck, IconExternal, IconStar } from './icons.jsx';
+
+const isLink = (url) => /^https?:\/\//.test(url || '');
 
 export function DemoBadge() {
-  return <span title="Simulated prices, ratings and delivery times from the demo store feed. Not a real retailer listing." className="border border-brass px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-widest text-brass">Demo data</span>;
+  return <span title="Simulated prices and ratings from the demo store feed. Not a real retailer listing." className="rounded-md border border-amber/40 bg-amber/10 px-1.5 py-0.5 text-[10.5px] font-semibold uppercase tracking-wide text-amber">Demo data</span>;
 }
 
-export const deliveryLine = (delivery) => (delivery ? `Delivers in about ${delivery.label}${delivery.feeInr > 0 ? ` · delivery fee ₹${delivery.feeInr}` : ' · free delivery'}` : null);
-
-const ACCENT = { Fastest: 'border-t-slate text-slate', Budget: 'border-t-bottle text-bottle', Smart: 'border-t-brass text-brass', Premium: 'border-t-ink text-ink', 'Top rated': 'border-t-sage text-sage', Stretch: 'border-t-wine text-wine' };
-const accent = (card) => ACCENT[card.strategies[0].replace(' alt', '')] || 'border-t-muted text-muted';
-
 export function OfferList({ product }) {
-  const offers = product.offers || [];
+  const offers = (product.offers || []).filter((o) => o.merchant);
   if (offers.length < 2) return null;
   return (
-    <details className="group text-[12.5px]">
-      <summary className="cursor-pointer list-none text-muted hover:text-ink">
-        <span className="link">Compare {offers.length} retailers</span>
-      </summary>
-      <ul className="mt-2 divide-y divide-rule border border-rule bg-paper">
+    <details className="group text-[13px]">
+      <summary className="cursor-pointer list-none font-semibold text-azure hover:underline">Compare {offers.length} stores</summary>
+      <ul className="mt-2 divide-y divide-rule overflow-hidden rounded-lg border border-rule">
         {offers.map((offer, index) => (
-          <li key={`${offer.merchant}-${index}`} className="flex items-center justify-between gap-3 px-3 py-2">
-            <span className="min-w-0">
-              <span className="block truncate">{offer.merchant || 'Retailer'}{index === 0 && <span className="ml-2 text-[10px] font-semibold uppercase tracking-widest text-bottle">Lowest</span>}</span>
-              {offer.delivery && <span className="block text-[11.5px] text-slate">{offer.delivery.label}{offer.delivery.feeInr > 0 ? ` · fee ₹${offer.delivery.feeInr}` : ' · free delivery'}</span>}
-            </span>
+          <li key={`${offer.merchant}-${index}`} className="flex items-center justify-between gap-3 bg-paper px-3 py-2">
+            <span className="min-w-0 truncate">{offer.merchant}{index === 0 && <span className="ml-2 rounded bg-mint/10 px-1.5 py-0.5 text-[10.5px] font-semibold text-mint">Lowest</span>}</span>
             <span className="flex flex-none items-center gap-3">
-              <b className="serif text-[17px]">{money(offer.price)}</b>
-              {/^https?:\/\//.test(offer.url) && <a href={offer.url} target="_blank" rel="noopener noreferrer" className="link text-[11.5px]">View</a>}
+              <b className="num font-semibold text-navy">{money(offer.price)}</b>
+              {isLink(offer.url) && <a href={offer.url} target="_blank" rel="noopener noreferrer" className="link text-xs">View</a>}
             </span>
           </li>
         ))}
@@ -36,121 +30,118 @@ export function OfferList({ product }) {
   );
 }
 
-export default function ProductCard({ card, category, inCart, onAdded, onBuyNow, rejectReasons }) {
+export default function ProductCard({ card, category, inCart, onAdded, rejectReasons }) {
   const { product } = card;
+  const bucket = bucketOf(card);
   const strategy = card.strategies[0];
-  const [busy, setBusy] = useState('');
+  const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState('');
   const [askReason, setAskReason] = useState(false);
   const [error, setError] = useState('');
   const [imageFailed, setImageFailed] = useState(false);
 
-  const add = async (buyNow) => {
-    setBusy(buyNow ? 'buy' : 'add');
+  const add = async () => {
+    setBusy(true);
     setError('');
-    try {
-      const cart = inCart ? null : await api.addToCart(product.id, strategy, category);
-      if (cart) onAdded(cart);
-      if (buyNow) onBuyNow(cart);
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setBusy('');
-    }
+    try { onAdded(await api.addToCart(product.id, strategy, category)); } catch (e) { setError(e.message); } finally { setBusy(false); }
   };
-
   const send = async (payload, message) => {
     try {
       await api.feedback({ productId: product.id, strategy, category, ...payload });
       setFeedback(message);
       setAskReason(false);
-    } catch (e) {
-      setError(e.message);
-    }
+    } catch (e) { setError(e.message); }
   };
+  // Opening the retailer page counts as choosing this card, so the baskets learn from it.
+  const clicked = () => { api.feedback({ type: 'click', productId: product.id, strategy, category }).catch(() => {}); };
 
   const discount = product.compareAtPrice ? Math.round((1 - product.price / product.compareAtPrice) * 100) : 0;
+  const retailerLink = isLink(product.buyUrl);
 
   return (
-    <article className={`flex flex-col border border-rule border-t-[3px] bg-paper animate-rise ${accent(card)}`}>
-      <div className="flex items-center justify-between px-4 pt-3">
-        <span className="eyebrow !text-inherit">{card.label}</span>
-        <span className="flex items-center gap-2">
-          {product.demo && <DemoBadge />}
-          {product.rating && <span className="text-[12px] text-muted">{product.rating.value} / 5 · {product.rating.count}</span>}
+    <article className="card flex flex-col overflow-hidden animate-rise">
+      <div className="flex items-center justify-between gap-2 border-b border-rule px-4 py-2.5">
+        <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-navy">
+          <span className="h-2.5 w-2.5 rounded-full" style={{ background: bucket.color }} />{card.label}
         </span>
+        {product.demo && <DemoBadge />}
       </div>
-      <div className="mx-4 mt-3 flex h-44 items-center justify-center border border-rule bg-white p-3">
+
+      <div className="flex h-48 items-center justify-center border-b border-rule bg-paper p-4">
         {product.image && !imageFailed
           ? <img src={product.image} alt={product.name} loading="lazy" className="max-h-full max-w-full object-contain" onError={() => setImageFailed(true)} />
           : <span className="text-xs text-muted">Image unavailable</span>}
       </div>
-      <div className="flex flex-1 flex-col gap-3 p-4 text-ink">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-muted">{product.brand || 'Brand not listed'}</p>
-          <h3 className="serif mt-0.5 line-clamp-2 text-[19px] font-semibold leading-tight">{product.name}</h3>
-        </div>
-        <div className="flex items-baseline gap-3">
-          <span className="serif text-3xl font-semibold">{money(product.price)}</span>
-          <span className="text-xs text-muted">{inr(product.price)}</span>
-          {discount >= 5 && <span className="text-xs text-muted"><s>{money(product.compareAtPrice)}</s> <b className="text-bottle">{discount}% off</b></span>}
-        </div>
-        <p className="text-[12.5px]">
-          <b className="font-semibold">{product.merchant || 'Retailer not listed'}</b>
-          <span className="text-muted">
-            {product.availability ? ` · ${product.availability.replace(/([a-z])([A-Z])/g, '$1 $2')}` : ''}
-            {!product.rating && ' · No ratings listed'}
-          </span>
-        </p>
-        {product.delivery
-          ? <p className="text-[13px] text-slate"><b>{deliveryLine(product.delivery)}</b></p>
-          : <p className="text-[12px] italic text-muted">Delivery time not reported by this retailer</p>}
-        <OfferList product={product} />
-        {product.specChips.length > 0
-          ? <p className="border-y border-rule py-2 text-[12.5px] leading-relaxed">{product.specChips.join('  ·  ')}</p>
-          : product.features?.length > 0
-            ? <p className="border-y border-rule py-2 text-[12.5px] leading-relaxed">{[...(product.attributes || []), ...product.features].slice(0, 5).join('  ·  ')}</p>
-            : <p className="border-y border-rule py-2 text-[12.5px] italic text-muted">Specifications not listed by the retailer</p>}
 
-        <p className="text-[13px] leading-relaxed"><span className="serif text-[15px] font-semibold italic">Why this one. </span>{card.position}</p>
-        {card.matches.length > 0 && <ul className="space-y-0.5 text-[12.5px] text-sage">{card.matches.map((m) => <li key={m}>— {m}</li>)}</ul>}
-        {(card.pros.length > 0 || card.cons.length > 0) && (
-          <div className="grid grid-cols-2 gap-x-4 text-[12.5px] leading-snug">
-            <ul className="space-y-1">{card.pros.map((p) => <li key={p}><b className="text-sage">+</b> {p}</li>)}</ul>
-            <ul className="space-y-1 text-muted">{card.cons.map((c) => <li key={c}><b className="text-wine">−</b> {c}</li>)}</ul>
-          </div>
+      <div className="flex flex-1 flex-col gap-3 p-4">
+        <div>
+          {product.brand && <p className="text-xs font-semibold uppercase tracking-wide text-muted">{product.brand}</p>}
+          <h3 className="display line-clamp-2 text-[18px] font-medium leading-snug text-navy">{product.name}</h3>
+        </div>
+
+        <div className="num flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span className="display text-[28px] font-semibold leading-none text-navy">{money(product.price)}</span>
+          <span className="text-xs text-muted">{inr(product.price)}</span>
+          {discount >= 5 && <span className="text-xs"><s className="text-muted">{money(product.compareAtPrice)}</s> <b className="rounded bg-mint/10 px-1.5 py-0.5 text-mint">{discount}% off</b></span>}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted">
+          {product.rating
+            ? <span className="inline-flex items-center gap-1 font-semibold text-navy"><IconStar className="text-amber" size={14} />{product.rating.value}<span className="font-normal text-muted">({product.rating.count.toLocaleString()})</span></span>
+            : <span>No ratings listed</span>}
+          <span>{product.merchant || 'Retailer not listed'}</span>
+        </div>
+
+        <OfferList product={product} />
+
+        {product.specChips.length > 0
+          ? <div className="flex flex-wrap gap-1.5">{product.specChips.map((chip) => <span key={chip} className="rounded-md bg-mist px-2 py-0.5 text-xs font-medium text-navy">{chip}</span>)}</div>
+          : product.features?.length > 0 && <p className="text-[12.5px] leading-snug text-muted">{[...(product.attributes || []), ...product.features].slice(0, 4).join(' · ')}</p>}
+
+        <div className="rounded-lg bg-mist p-3 text-[13px] leading-relaxed text-ink">
+          <span className="font-semibold text-navy">Why this pick. </span>{card.position}
+        </div>
+
+        {(card.pros.length > 0 || card.cons.length > 0 || card.matches.length > 0) && (
+          <details className="text-[13px]">
+            <summary className="cursor-pointer list-none font-semibold text-azure hover:underline">Pros, cons and fit</summary>
+            <div className="mt-2 space-y-2">
+              {card.matches.length > 0 && <ul className="space-y-1 text-mint">{card.matches.map((m) => <li key={m} className="flex gap-1.5"><IconCheck size={15} className="mt-0.5 flex-none" />{m}</li>)}</ul>}
+              <div className="grid grid-cols-2 gap-x-4">
+                <ul className="space-y-1">{card.pros.map((p) => <li key={p} className="flex gap-1.5"><span className="font-bold text-mint">+</span>{p}</li>)}</ul>
+                <ul className="space-y-1 text-muted">{card.cons.map((c) => <li key={c} className="flex gap-1.5"><span className="font-bold text-danger">−</span>{c}</li>)}</ul>
+              </div>
+            </div>
+          </details>
         )}
 
-        <div className="mt-auto space-y-2 pt-1">
-          <div className="grid grid-cols-2 gap-2">
-            <button type="button" className="btn btn-primary" disabled={!!busy} onClick={() => add(true)}>{busy === 'buy' ? 'One moment…' : 'Buy now'}</button>
-            <button type="button" className="btn btn-outline" disabled={!!busy || inCart} onClick={() => add(false)}>{inCart ? 'In cart' : busy === 'add' ? 'Adding…' : 'Add to cart'}</button>
+        <div className="mt-auto space-y-2.5 pt-1">
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {retailerLink
+              ? <a href={product.buyUrl} target="_blank" rel="noopener noreferrer" onClick={clicked} className="btn btn-primary">Buy at {product.merchant || 'retailer'} <IconExternal size={16} /></a>
+              : <span className="btn btn-outline !cursor-default !border-dashed !text-muted">No retailer page</span>}
+            <button type="button" className="btn btn-outline" disabled={busy || inCart} onClick={add}>{inCart ? 'In cart' : busy ? 'Adding…' : 'Add to cart'}</button>
           </div>
-          <div className="flex items-center justify-between text-[12px]">
-            {product.buyUrl && /^https?:\/\//.test(product.buyUrl) ? <a href={product.buyUrl} target="_blank" rel="noopener noreferrer" className="link">View at retailer</a> : <span className="text-muted">{product.demo ? 'Simulated store listing' : 'Retailer link unavailable'}</span>}
-            {feedback ? <span className="text-sage">{feedback}</span> : (
+          <div className="flex items-center justify-between text-[13px]">
+            <span className="text-xs text-muted">{product.demo ? 'Simulated listing' : `via ${product.source || 'retailer'}`}</span>
+            {feedback ? <span className="font-medium text-mint">{feedback}</span> : (
               <span className="flex gap-4 text-muted">
-                <button type="button" className="hover:text-ink" onClick={() => send({ type: 'like' }, 'Noted, thank you')}>Like</button>
-                <button type="button" className="hover:text-ink" onClick={() => setAskReason((v) => !v)}>Not for me</button>
+                <button type="button" className="hover:text-navy" onClick={() => send({ type: 'like' }, 'Noted, thank you')}>Like</button>
+                <button type="button" className="hover:text-navy" onClick={() => setAskReason((v) => !v)}>Not for me</button>
               </span>
             )}
           </div>
           {askReason && (
-            <div className="border border-rule bg-canvas p-2.5 text-[12px]">
-              <p className="mb-1.5 font-semibold">What put you off?</p>
+            <div className="rounded-lg border border-rule bg-canvas p-3 text-[13px]">
+              <p className="mb-2 font-semibold text-navy">What put you off?</p>
               <div className="flex flex-wrap gap-1.5">
                 {Object.entries(rejectReasons || {}).map(([key, label]) => (
-                  <button key={key} type="button" onClick={() => send({ type: 'reject', reason: key }, 'Understood, noted')} className="border border-rule bg-paper px-2.5 py-1 hover:border-ink">{label}</button>
+                  <button key={key} type="button" onClick={() => send({ type: 'reject', reason: key }, 'Understood, noted')} className="chip transition hover:border-azure hover:text-azure">{label}</button>
                 ))}
               </div>
             </div>
           )}
-          {error && <p className="text-xs text-wine">{error}</p>}
-          <p className="text-[10.5px] uppercase tracking-wider text-muted">
-            {product.demo
-              ? 'Simulated price, rating and delivery time (demo data)'
-              : `Price verified · Rating ${card.verified.rating ? 'verified' : 'not listed'} · Specs ${card.verified.specs ? 'from listing' : 'not listed'}`}
-          </p>
+          {error && <p className="text-xs text-danger">{error}</p>}
         </div>
       </div>
     </article>

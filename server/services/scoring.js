@@ -112,8 +112,8 @@ export function filterCandidates(products, req) {
   const CONSUMABLE = ['grocery', 'snacks', 'household', 'personal', 'baby', 'pet'];
   if (pool.some((p) => p.demo && CONSUMABLE.includes(p.category?.path?.[1]))) {
     const before = pool.length;
-    pool = pool.filter((p) => p.demo);
-    if (pool.length < before) notes.push('Everyday items are compared across the demo store feed. Real retailer listings for this item are not available in the connected catalogue.');
+    pool = pool.filter((p) => p.demo || p.source !== 'Channel3'); // Google Shopping listings are kept: they do cover everyday items
+    if (pool.length < before && !pool.some((p) => !p.demo)) notes.push('Everyday items are compared across the demo store feed. Real retailer listings for this item are not available in the connected catalogue.');
   }
 
   const relevant = pool.filter((p) => isRelevant(p, req));
@@ -161,19 +161,20 @@ function featuresFor(product, req) {
 
 const EMPTY_PROFILE = { brand: {}, strategy: {}, budgetSensitivity: 0, dominant: null, tally: {} };
 
-export const deliveryText = (minutes) => (minutes < 60 ? `${minutes} minutes` : minutes < 1440 ? `${Math.round(minutes / 60)} hours` : `${Math.round(minutes / 1440)} day(s)`);
-/** What the shopper really pays for the listing: item price plus its delivery fee (when the provider reports one). */
-export const landedPrice = (product) => product.price + (product.delivery?.feeUsd || 0);
-/** 1 = within minutes, 0 = a week away. Log scale, because 10 vs 20 minutes matters more than 3 vs 4 days. */
-const speedOf = (product) => {
-  if (!product.delivery) return null;
-  const m = Math.max(5, product.delivery.minutes);
-  return Math.max(0, Math.min(1, 1 - Math.log10(m / 5) / Math.log10(7200 / 5)));
-};
+// ---- The final set of buckets (cards) ----
+//  Best overall  (Smart)    best mix of quality and price
+//  Best quality  (Premium)  strongest specs / ratings that still fit the budget
+//  Best price    (Budget)   lowest price that still meets every requirement
+//  Most loved    (Loved)    highest rating we can trust (many reviews)
+//  Best deal     (Deal)     biggest verified markdown against the listed regular price, from a well-rated product
+//  Picked for you (Personal) the best option from a brand this shopper has shown they like
+//  Stretch pick  (Stretch)  slightly above budget, only when the shopper allows it
+// Only Best overall, Best quality and Best price are "styles" that Buypal learns from; the rest are evidence-based extras.
+const MIN_LOVED_REVIEWS = 50;
 
 /**
- * Filters and scores candidates. Returns every eligible option with its Budget / Premium / Smart scores.
- * Used by the recommendation cards and by the multi-product cart builder.
+ * Filters and scores candidates. Returns every eligible option with its scores for each bucket.
+ * Used by the recommendation cards and by the multi-product setup builder.
  */
 export function rankOptions(products, req, profile = EMPTY_PROFILE) {
   const { pool, notes } = filterCandidates(products, req);
@@ -182,15 +183,9 @@ export function rankOptions(products, req, profile = EMPTY_PROFILE) {
   const empty = { pool, notes, stats, budget, within: [], over: [], eligible: [], med: 0, minP: 0 };
   if (pool.length === 0) return empty;
 
-  let within = pool.filter((p) => p.price <= budget);
+  const within = pool.filter((p) => p.price <= budget);
   const over = pool.filter((p) => p.price > budget);
   if (within.length === 0) return { ...empty, over };
-
-  if (req.maxDeliveryMinutes) {
-    const fast = within.filter((p) => p.delivery && p.delivery.minutes <= req.maxDeliveryMinutes);
-    if (fast.length) within = fast;
-    else notes.push(`No store in the available data can deliver within ${deliveryText(req.maxDeliveryMinutes)}, so these are the fastest options found. Listings from providers that do not report delivery times cannot be confirmed as fast.`);
-  }
 
   const entries = within.map((product) => ({ product, ...featuresFor(product, req) }));
   let eligible = entries.filter((e) => e.mustMissing.length === 0);
@@ -201,36 +196,41 @@ export function rankOptions(products, req, profile = EMPTY_PROFILE) {
   }
   stats.eligible = eligible.length;
 
-  const prices = eligible.map((e) => landedPrice(e.product));
+  const prices = eligible.map((e) => e.product.price);
   const minP = Math.min(...prices);
   const span = Math.max(...prices) - minP || 1;
   const lambda = Math.max(0.1, 0.3 + 0.24 * profile.budgetSensitivity);
-  const brandBonus = (p) => {
-    const pref = profile.brand[(p.brand || '').toLowerCase()] || 0;
-    const wanted = (req.preferredBrands || []).some((b) => b.toLowerCase() === (p.brand || '').toLowerCase()) ? 0.08 : 0;
-    return pref * 0.02 + wanted;
-  };
+  const brandAffinity = (p) => profile.brand[(p.brand || '').toLowerCase()] || 0;
+  const preferred = (p) => (req.preferredBrands || []).some((b) => b.toLowerCase() === (p.brand || '').toLowerCase());
+  const brandBonus = (p) => brandAffinity(p) * 0.02 + (preferred(p) ? 0.08 : 0);
 
   for (const entry of eligible) {
-    const priceNorm = (landedPrice(entry.product) - minP) / span;
+    const p = entry.product;
+    const priceNorm = (p.price - minP) / span;
     const q = entry.quality ?? 0.5;
     const perfOrQuality = entry.perf ?? q;
     entry.priceNorm = priceNorm;
-    entry.speed = speedOf(entry.product);
-    entry.composite = 0.4 * perfOrQuality + 0.3 * q + 0.3 * entry.fit + brandBonus(entry.product);
+    entry.composite = 0.4 * perfOrQuality + 0.3 * q + 0.3 * entry.fit + brandBonus(p);
+    const credibleDeal = entry.discount >= 0.1 && entry.discount <= 0.5 && p.rating && p.rating.value >= 3.8 && p.rating.count >= 5;
+    const loved = p.rating && p.rating.count >= MIN_LOVED_REVIEWS && p.rating.value >= 4.2;
+    const liked = brandAffinity(p) >= 1 || preferred(p);
     entry.scores = {
-      Budget: 0.6 * (1 - priceNorm) + 0.25 * entry.fit + 0.15 * q + 0.05 * Math.min(entry.discount, 0.3) / 0.3 + brandBonus(entry.product),
-      Premium: 0.4 * (entry.perf ?? priceNorm) + 0.3 * q + 0.2 * entry.fit + 0.1 * priceNorm + brandBonus(entry.product),
+      Budget: 0.6 * (1 - priceNorm) + 0.25 * entry.fit + 0.15 * q + 0.05 * Math.min(entry.discount, 0.3) / 0.3 + brandBonus(p),
+      Premium: 0.4 * (entry.perf ?? priceNorm) + 0.3 * q + 0.2 * entry.fit + 0.1 * priceNorm + brandBonus(p),
       Smart: entry.composite - lambda * priceNorm,
-      Fastest: entry.speed == null ? -1 : 0.65 * entry.speed + 0.2 * (1 - priceNorm) + 0.15 * q + brandBonus(entry.product),
+      Loved: loved ? q + 0.05 * Math.min(1, Math.log10(p.rating.count) / 4) + 0.1 * entry.fit : -1,
+      Deal: credibleDeal ? 0.55 * entry.discount + 0.3 * q + 0.15 * (1 - priceNorm) : -1,
+      Personal: liked ? 0.7 * entry.composite + 0.3 * Math.min(1, (brandAffinity(p) + (preferred(p) ? 3 : 0)) / 5) : -1,
     };
   }
   return { pool, notes, stats, budget, within, over, eligible, med: median(prices), minP };
 }
 
+const STYLE_KEYS = ['Smart', 'Premium', 'Budget'];
+
 /**
- * Builds the adaptive set of recommendation cards.
- * `profile` comes from preferences.getProfile; it changes ordering, brand weighting and how many cards of one strategy appear.
+ * Builds the adaptive set of recommendation cards (at most five).
+ * The three styles are ordered by this shopper's priority and history; the evidence-based extras follow.
  */
 export function buildRecommendations(products, req, profile = EMPTY_PROFILE) {
   const { notes, stats, budget, within, over, eligible, med, minP, pool } = rankOptions(products, req, profile);
@@ -240,18 +240,21 @@ export function buildRecommendations(products, req, profile = EMPTY_PROFILE) {
     return { cards: [], notes, stats, cheapest: publicProduct([...pool].sort((a, b) => a.price - b.price)[0]) };
   }
 
-  const best = (list, strategy, skip = new Set()) =>
-    [...list].filter((e) => !skip.has(e.product.id)).sort((a, b) => b.scores[strategy] - a.scores[strategy])[0] || null;
+  const best = (list, bucket, skip = new Set()) => {
+    const top = [...list].filter((e) => !skip.has(e.product.id)).sort((a, b) => b.scores[bucket] - a.scores[bucket])[0];
+    return top && top.scores[bucket] > -1 ? top : null;
+  };
 
   // Prefer products with a meaningful number of good reviews, so the cheapest pick is not an unrated no-name listing.
   const reviewed = eligible.filter((e) => e.quality !== null && e.quality >= 0.3 && e.product.rating.count >= 10);
   const budgetPool = reviewed.length >= 2 ? reviewed : eligible.filter((e) => e.quality === null || e.quality >= 0.3);
-  const withDelivery = eligible.filter((e) => e.speed != null);
   const picks = {
     Budget: best(budgetPool.length ? budgetPool : eligible, 'Budget'),
     Premium: best(eligible, 'Premium'),
     Smart: best(eligible, 'Smart'),
-    Fastest: withDelivery.length ? best(withDelivery, 'Fastest') : null,
+    Loved: best(eligible, 'Loved'),
+    Deal: best(eligible, 'Deal'),
+    Personal: best(eligible, 'Personal'),
   };
 
   const byProduct = new Map();
@@ -261,53 +264,64 @@ export function buildRecommendations(products, req, profile = EMPTY_PROFILE) {
     if (!record.roles.includes(role)) record.roles.push(role);
     byProduct.set(entry.product.id, record);
   };
-  // Which baskets to show, and in what order, adapts to this shopper: stated priority, what they chose before and the urgency of this request.
-  const affinityOf = (basket) => (profile.strategy[basket] ?? 0) + (basket === 'Fastest' && req.maxDeliveryMinutes ? 10 : 0);
-  const defaultOrder = ['Budget', 'Smart', 'Premium', 'Fastest'];
-  const basketOrder = defaultOrder.filter((b) => picks[b]).sort((a, b) => affinityOf(b) - affinityOf(a) || defaultOrder.indexOf(a) - defaultOrder.indexOf(b));
-  basketOrder.forEach((role) => addRole(picks[role], role));
 
-  // Adaptive extras based on what this user usually chooses, and on what the data shows.
-  // The basket the shopper favours gets a runner-up even if that makes a fifth card.
-  if (profile.dominant && byProduct.size < 5) {
-    const runnerUp = best(eligible, profile.dominant, new Set(byProduct.keys()));
-    if (runnerUp && (runnerUp.scores[profile.dominant] ?? -1) > -1) addRole(runnerUp, `${profile.dominant} alt`);
-  }
-  const topRated = [...eligible].filter((e) => e.product.rating?.count >= 30 && e.quality !== null)
-    .sort((a, b) => b.quality - a.quality)[0];
-  const maxPickQuality = Math.max(...Object.values(picks).filter(Boolean).map((e) => e.quality ?? 0));
-  if (topRated && !byProduct.has(topRated.product.id) && topRated.quality >= maxPickQuality + 0.05 && byProduct.size < 4) addRole(topRated, 'Top rated');
-  if (req.allowOverBudget && byProduct.size < 4) {
+  const affinityOf = (bucket) => profile.strategy[bucket] ?? 0;
+  const defaultOrder = ['Smart', 'Budget', 'Premium'];
+  const styleOrder = defaultOrder.filter((b) => picks[b]).sort((a, b) => affinityOf(b) - affinityOf(a) || defaultOrder.indexOf(a) - defaultOrder.indexOf(b));
+  styleOrder.forEach((role) => addRole(picks[role], role));
+
+  // Extras, in the order this shopper is most likely to care about: personal first, then deals for price-sensitive shoppers
+  // or "most loved" for everyone else.
+  const extras = profile.budgetSensitivity > 0.2 ? ['Personal', 'Deal', 'Loved'] : ['Personal', 'Loved', 'Deal'];
+  extras.forEach((role) => addRole(picks[role], role));
+
+  if (req.allowOverBudget && byProduct.size < 5) {
     const stretch = over.filter((p) => p.price <= budget * 1.3).map((product) => ({ product, ...featuresFor(product, req) }))
       .filter((e) => e.mustMissing.length === 0)
       .sort((a, b) => (b.perf ?? b.quality ?? 0) - (a.perf ?? a.quality ?? 0))[0];
     if (stretch) { stretch.scores = {}; addRole(stretch, 'Stretch'); }
   }
+  // The style the shopper favours gets a runner-up when there is room.
+  if (profile.dominant && STYLE_KEYS.includes(profile.dominant) && byProduct.size < 5) {
+    const runnerUp = best(eligible, profile.dominant, new Set(byProduct.keys()));
+    if (runnerUp) addRole(runnerUp, `${profile.dominant} alt`);
+  }
 
-  const affinity = (roles) => Math.max(...roles.map((r) => affinityOf(r.replace(' alt', ''))));
-  const order = defaultOrder;
-  const rankOf = (roles) => { const i = order.indexOf(roles[0]); return i === -1 ? 99 : i; };
-  const records = [...byProduct.values()].sort((a, b) => affinity(b.roles) - affinity(a.roles) || rankOf(a.roles) - rankOf(b.roles));
+  const orderIndex = (roles) => {
+    const primary = roles[0].replace(' alt', '');
+    const i = [...styleOrder, ...extras, 'Stretch'].indexOf(primary);
+    return i === -1 ? 99 : i + (roles[0].endsWith(' alt') ? 0.5 : 0);
+  };
+  const records = [...byProduct.values()].sort((a, b) => orderIndex(a.roles) - orderIndex(b.roles));
 
   const ctx = { budget, picks, eligible, med, minP, profile, req };
   const cards = records.slice(0, 5).map(({ entry, roles }) => makeCard(entry, roles, ctx));
-  return { cards, notes, stats, basketPlan: explainBaskets({ picks, basketOrder, profile, req, affinityOf }) };
+  return { cards, notes, stats, basketPlan: explainBaskets({ picks, profile, cards }) };
 }
 
-const DISPLAY = { Fastest: 'Quickest delivery', 'Fastest alt': 'Also quick to arrive', Budget: 'Best price', Smart: 'Best overall', Premium: 'Best quality', 'Budget alt': 'Also strong on price', 'Smart alt': 'Also strong overall', 'Premium alt': 'Also strong on quality', 'Top rated': 'Top rated', Stretch: 'Stretch pick' };
-const STYLE = { Budget: 'price', Smart: 'overall value', Premium: 'quality', Fastest: 'speed' };
-const BASKET_NAME = { Budget: 'Best price', Smart: 'Best overall', Premium: 'Best quality', Fastest: 'Quickest delivery' };
+const DISPLAY = {
+  Smart: 'Best overall', Premium: 'Best quality', Budget: 'Best price', Loved: 'Most loved', Deal: 'Best deal', Personal: 'Picked for you', Stretch: 'Stretch pick',
+  'Smart alt': 'Also strong overall', 'Premium alt': 'Also strong on quality', 'Budget alt': 'Also strong on price',
+};
+const STYLE = { Budget: 'price', Smart: 'overall value', Premium: 'quality' };
+const BUCKET_NAME = { Budget: 'Best price', Smart: 'Best overall', Premium: 'Best quality' };
 
-/** Plain-language account of why these baskets, in this order, for this shopper. */
-function explainBaskets({ picks, basketOrder, profile, req, affinityOf }) {
+/** Plain-language account of why these cards, in this order, for this shopper. */
+function explainBaskets({ picks, profile, cards }) {
   const lines = [];
-  if (req.maxDeliveryMinutes) lines.push(`You need it within ${deliveryText(req.maxDeliveryMinutes)}, so Quickest delivery leads.`);
-  if (profile.priority) lines.push(`Your priority is ${{ price: 'the lowest price', quality: 'the best quality', balanced: 'the best balance', speed: 'the fastest delivery' }[profile.priority]}, which pushes ${BASKET_NAME[{ price: 'Budget', quality: 'Premium', balanced: 'Smart', speed: 'Fastest' }[profile.priority]]} up.`);
+  if (profile.priority) {
+    const lead = { price: 'Budget', quality: 'Premium', balanced: 'Smart' }[profile.priority];
+    lines.push(`Your priority is ${{ price: 'the lowest price', quality: 'the best quality', balanced: 'the best balance' }[profile.priority]}, which pushes ${BUCKET_NAME[lead]} up.`);
+  }
   const tally = Object.entries(profile.tally || {}).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
-  if (tally.length) lines.push(`From your past choices: ${tally.map(([b, n]) => `${BASKET_NAME[b] || b} ×${n}`).join(', ')}. Baskets you pick more often come first and get a runner-up.`);
-  if (!picks.Fastest) lines.push('No quickest-delivery basket this time: none of the matching listings report a delivery time.');
-  if (!lines.length) lines.push('No history yet. Baskets are in the default order and will adapt as you choose and buy.');
-  return { order: basketOrder.map((b) => ({ basket: b, label: BASKET_NAME[b], weight: Math.round(affinityOf(b) * 10) / 10 })), lines };
+  if (tally.length) lines.push(`From your past choices: ${tally.map(([b, n]) => `${BUCKET_NAME[b] || b} ×${n}`).join(', ')}. Styles you pick more often come first and get a runner-up.`);
+  if (picks.Personal) lines.push('Picked for you appears because you have shown you like this brand.');
+  const missing = [];
+  if (!picks.Deal) missing.push('Best deal (no well-rated product has a credible verified markdown)');
+  if (!picks.Loved) missing.push(`Most loved (no option has ${MIN_LOVED_REVIEWS}+ strong reviews)`);
+  if (missing.length) lines.push(`Not shown this time: ${missing.join('; ')}.`);
+  if (!profile.priority && !tally.length) lines.unshift('No history yet. Cards are in the default order and will adapt as you choose and buy.');
+  return { order: cards.map((c) => ({ basket: c.strategies[0], label: c.label })), lines };
 }
 const roleLabel = (roles) => roles.map((r) => DISPLAY[r] || r).join(' · ');
 
@@ -321,11 +335,7 @@ function makeCard(entry, roles, ctx) {
   const pros = [];
   const cons = [];
 
-  if (roles.includes('Budget')) positions.push(`Lowest ${product.delivery ? 'total cost, item plus delivery' : 'price'} (${fmtUsd(landedPrice(product))}) among ${n} listing${n === 1 ? '' : 's'} that meet your requirements.`);
-  if (roles.includes('Fastest')) {
-    const cheaper = picks.Budget && picks.Budget.product.id !== product.id ? landedPrice(product) - landedPrice(picks.Budget.product) : 0;
-    positions.push(`Quickest delivery: about ${product.delivery.label} from ${product.merchant}${cheaper > 0.005 ? `, for ${fmtUsd(cheaper)} more than the cheapest basket` : ''}.`);
-  }
+  if (roles.includes('Budget')) positions.push(`Lowest price (${fmtUsd(product.price)}) among ${n} listing${n === 1 ? '' : 's'} that meet your requirements.`);
   if (roles.includes('Premium')) {
     const rank = [...eligible].sort((a, b) => (b.perf ?? b.priceNorm) - (a.perf ?? a.priceNorm)).findIndex((e) => e.product.id === product.id) + 1;
     positions.push(entry.perf != null
@@ -342,11 +352,12 @@ function makeCard(entry, roles, ctx) {
         : 'Best balance of price, ratings, specs and requirement fit.');
     } else positions.push('Best balance of price, ratings, specs and requirement fit.');
   }
+  if (roles.includes('Loved')) positions.push(`Most loved: rated ${product.rating.value}/5 by ${product.rating.count} buyers, the most trustworthy rating among the options.`);
+  if (roles.includes('Deal')) positions.push(`Best deal: ${Math.round(entry.discount * 100)}% below the listed regular price (${fmtUsd(product.compareAtPrice)}), and well rated (${product.rating.value}/5 from ${product.rating.count} reviews).`);
+  if (roles.includes('Personal')) positions.push(`Picked for you: you have liked ${product.brand || 'this brand'} before, and this is the strongest ${product.brand || 'matching'} option here.`);
   if (roles.some((r) => r.endsWith(' alt'))) positions.push(`Runner-up on ${STYLE[roles.find((r) => r.endsWith(' alt')).replace(' alt', '')]}, which is what you usually choose.`);
-  if (roles.includes('Top rated')) positions.push(`Highest buyer rating (${product.rating.value}/5 from ${product.rating.count} reviews) among the options.`);
   if (roles.includes('Stretch')) positions.push(`Above your budget by ${fmtUsd(product.price - budget)}, shown because you allowed higher-priced alternatives.`);
 
-  if (product.delivery) pros.push(`Delivers in about ${product.delivery.label} from ${product.merchant}${product.delivery.feeInr === 0 ? ', free delivery' : ''}`);
   if (product.rating) pros.push(`Rated ${product.rating.value}/5 by ${product.rating.count} buyers`);
   const chips = specChips(product.specs).filter((chip) => !/^(\d+(\.\d+)?kg|.*battery)$/.test(chip)).slice(0, 3);
   if (chips.length) pros.push(`Listed specs: ${chips.join(', ')}`);
@@ -356,8 +367,6 @@ function makeCard(entry, roles, ctx) {
   if (product.specs.weightKg && product.specs.weightKg <= 1.8) pros.push(`Light at ${product.specs.weightKg}kg`);
   if (product.specs.batteryHours && product.specs.batteryHours >= 10) pros.push(`Up to ${product.specs.batteryHours}h battery (as listed)`);
 
-  if (product.delivery && product.delivery.feeInr > 0) cons.push(`Delivery fee ₹${product.delivery.feeInr} (about ${fmtUsd(product.delivery.feeUsd)})`);
-  if (product.delivery && req.maxDeliveryMinutes && product.delivery.minutes > req.maxDeliveryMinutes) cons.push(`Slower than the ${deliveryText(req.maxDeliveryMinutes)} you asked for`);
   if (entry.mustMissing.length) cons.push(`Listing doesn't confirm: ${entry.mustMissing.join(', ')}`);
   if (!product.rating) cons.push('No buyer ratings available');
   else if (product.rating.value < 3.8) cons.push(`Mixed reviews (${product.rating.value}/5)`);
@@ -384,7 +393,7 @@ function makeCard(entry, roles, ctx) {
     pros: pros.slice(0, 4),
     cons: cons.slice(0, 3),
     matches: matches.slice(0, 3),
-    verified: { price: !product.demo, rating: Boolean(product.rating), availability: Boolean(product.availability), specs: specChips(product.specs).length > 0, demo: Boolean(product.demo), delivery: Boolean(product.delivery) },
+    verified: { price: !product.demo, rating: Boolean(product.rating), availability: Boolean(product.availability), specs: specChips(product.specs).length > 0, demo: Boolean(product.demo) },
     savingsVsCheapest: cheapest ? Math.max(0, product.price - minP) : 0,
   };
 }

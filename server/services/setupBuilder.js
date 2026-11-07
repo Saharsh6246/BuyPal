@@ -1,9 +1,9 @@
 import { fmtUsd, roundMoney } from '../lib/money.js';
 import { getCachedProduct } from './channel3.js';
-import { addItem, clearCart, getCart, replaceItem, setCartMeta } from './cartService.js';
+import { addItem, CartError, clearCart, getCart, replaceItem, setCartMeta } from './cartService.js';
 import { getProfile } from './preferences.js';
 import { gatherProducts, normalizeRequirements } from './recommend.js';
-import { rankOptions } from './scoring.js';
+import { publicProduct, rankOptions } from './scoring.js';
 
 const DEFAULT_WEIGHT = { laptop: 5, desktop: 5, monitor: 2, keyboard: 0.8, mouse: 0.6, headphones: 1.2, webcam: 0.8, speaker: 1, tablet: 3, phone: 4 };
 
@@ -121,6 +121,13 @@ export async function optionsForSlot(userId, { category, terms = [], gaming = fa
   return { options, ranked, req };
 }
 
+const BASKETS = [
+  { key: 'Smart', label: 'Best overall', blurb: 'The strongest mix of quality and price for every part.' },
+  { key: 'Premium', label: 'Best quality', blurb: 'The best-reviewed, highest-performing part in each slot that still fits your budget.' },
+  { key: 'Budget', label: 'Best price', blurb: 'The lowest total that still meets every requirement.' },
+];
+const HINT_KEY = { price: 'Budget', quality: 'Premium', balanced: 'Smart' };
+
 const reasonFor = (option) => {
   const { product } = option;
   const bits = [];
@@ -131,12 +138,8 @@ const reasonFor = (option) => {
   return bits.join(' · ') || 'Best-scoring listing for this part of the setup';
 };
 
-/**
- * Builds a complete multi-product cart within a total budget and saves it as the user's cart.
- * Never exceeds the budget: if it cannot fit, nothing is added and the shortfall is reported.
- */
-export async function buildSetup(userId, { goal, budgetUsd, components }) {
-  const notes = [];
+/** Searches every part of a setup once and keeps the scored options. Shared by all baskets. */
+async function gatherSlots(userId, { goal, budgetUsd, components }) {
   let parts = Array.isArray(components) && components.length ? components : null;
   if (!parts) {
     const template = templateFor(goal);
@@ -154,44 +157,118 @@ export async function buildSetup(userId, { goal, budgetUsd, components }) {
 
   const slots = [];
   const missing = [];
-  for (const [i, part] of parts.entries()) {
+  const notes = [];
+  // Parts are searched in parallel. Only listings with a real retailer link can go in a setup, because the shopper
+  // completes the purchase at that retailer (simulated demo-store listings have no page to buy from).
+  const searched = await Promise.all(parts.map(async (part, i) => {
     const allocated = budgetUsd * shares[i];
     const { options, ranked } = await optionsForSlot(userId, {
       category: part.category, terms: part.must_have, gaming: part.must_have.includes('gaming'), capUsd: allocated * 1.5,
     });
+    return { part, allocated, options: options.filter((o) => /^https?:\/\//.test(o.product.buyUrl || '')), ranked };
+  }));
+  for (const { part, allocated, options, ranked } of searched) {
     if (!options.length) {
       missing.push(part.category);
       if (ranked.notes[0]) notes.push(`${part.category}: ${ranked.notes[0]}`);
       continue;
     }
-    slots.push({ ...part, options, cap: allocated * 1.08, quantity: part.quantity });
+    slots.push({ ...part, options, cap: allocated * 1.08 });
   }
+  return { slots, missing, notes };
+}
+
+/** The same slots, re-sorted and re-scored for one basket strategy (so the optimiser maximises that goal). */
+function slotsFor(slots, key) {
+  const out = slots.map((slot) => {
+    const options = slot.options.map((o) => ({ ...o, composite: o.scores[key] })).sort((a, b) => b.composite - a.composite);
+    return { ...slot, options };
+  });
+  return out.every((slot) => slot.options.length) ? out : null;
+}
+
+/**
+ * Builds several COMPLETE setups for one goal (best overall / best quality / best price),
+ * each within the total budget. Nothing is added to the cart: the shopper picks a basket, opens it, and buys each
+ * part at the retailer (Buypal has no API that can place orders on Amazon, Walmart and similar stores).
+ */
+export async function buildSetupBaskets(userId, { goal, budgetUsd, components, hint }) {
+  const gathered = await gatherSlots(userId, { goal, budgetUsd, components });
+  if (gathered.error) return { error: gathered.error };
+  const { slots, missing, notes } = gathered;
   if (!slots.length) return { error: 'I could not find suitable products for this setup within that budget.', missing };
 
-  const result = optimizeSelection(slots, budgetUsd);
-  if (!result.withinBudget) {
-    const cheapest = slots.reduce((sum, slot) => sum + Math.min(...slot.options.map(priceOf)) * slot.quantity, 0);
-    return {
-      error: `The cheapest listings I found for this setup add up to ${fmtUsd(cheapest)}, which is above your ${fmtUsd(budgetUsd)} budget. Nothing was added to the cart. Try a higher budget or fewer items.`,
-      cheapestTotal: roundMoney(cheapest, 'USD'), missing,
-    };
+  const cheapest = slots.reduce((sum, slot) => sum + Math.min(...slot.options.map(priceOf)) * slot.quantity, 0);
+  if (cheapest > budgetUsd + 0.005) {
+    return { error: `The cheapest listings I found for this setup add up to ${fmtUsd(cheapest)}, which is above your ${fmtUsd(budgetUsd)} budget. Try a higher budget or fewer items.`, cheapestTotal: roundMoney(cheapest, 'USD'), missing };
   }
 
-  clearCart(userId);
-  setCartMeta(userId, { budget: roundMoney(budgetUsd, 'USD'), goal: goal || null });
-  const items = [];
-  result.choice.forEach((option, i) => {
-    if (!option) return;
-    addItem(userId, option.product.id, { role: slots[i].category, strategy: 'Smart', terms: slots[i].must_have, quantity: slots[i].quantity });
-    items.push({ role: slots[i].category, productId: option.product.id, reason: reasonFor(option) });
-  });
+  const built = [];
+  for (const def of BASKETS) {
+    const scoped = slotsFor(slots, def.key);
+    if (!scoped) continue;
+    const result = optimizeSelection(scoped, budgetUsd);
+    if (!result.withinBudget || result.choice.some((c) => !c)) continue;
+    const items = result.choice.map((option, i) => ({
+      role: scoped[i].category,
+      quantity: scoped[i].quantity,
+      product: publicProduct(option.product),
+      reason: reasonFor(option),
+    }));
+    const total = roundMoney(items.reduce((sum, item) => sum + item.product.price * item.quantity, 0), 'USD');
+    built.push({ keys: [def.key], label: def.label, blurb: def.blurb, items, total, withinBudget: total <= budgetUsd + 0.005, leftover: roundMoney(budgetUsd - total, 'USD') });
+  }
+  if (!built.length) return { error: 'I could not assemble a complete setup within that budget.', missing };
+
+  // Identical setups are merged into one basket with a combined label.
+  const merged = [];
+  for (const basket of built) {
+    const signature = basket.items.map((i) => i.product.id).join(',');
+    const twin = merged.find((m) => m.signature === signature);
+    if (twin) { twin.keys.push(...basket.keys); twin.label = `${twin.label} · ${basket.label}`; } else merged.push({ ...basket, signature });
+  }
+
+  // Order the baskets for THIS shopper: what they asked for in words, their stated priority and past choices.
+  const profile = getProfile(userId, null);
+  const bonus = (key) => (HINT_KEY[hint] === key ? 10 : 0);
+  const weight = (b) => Math.max(...b.keys.map((k) => (profile.strategy[k] ?? 0) + bonus(k)));
+  merged.sort((a, b) => weight(b) - weight(a) || BASKETS.findIndex((d) => d.key === a.keys[0]) - BASKETS.findIndex((d) => d.key === b.keys[0]));
+
+  const lines = [];
+  if (hint) lines.push(`You asked for ${{ price: 'the lowest price', quality: 'high quality', balanced: 'quality at a fair price' }[hint]}, so ${merged[0].label} comes first.`);
+  if (profile.priority) lines.push(`Your stated priority is ${{ price: 'the lowest price', quality: 'the best quality', balanced: 'the best balance' }[profile.priority]}.`);
+  const tally = Object.entries(profile.tally || {}).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+  if (tally.length) lines.push(`From your past choices: ${tally.map(([k, n]) => `${BASKETS.find((d) => d.key === k)?.label || k} ×${n}`).join(', ')}.`);
+  if (merged.length < built.length) lines.push('Some strategies picked exactly the same parts, so they are shown as one basket.');
+  if (!lines.length) lines.push('No history yet. Baskets will adapt as you choose and buy.');
+
   if (missing.length) notes.push(`No suitable listing found for: ${missing.join(', ')}.`);
   const categories = slots.map((s) => s.category);
   if (categories.includes('monitor') && (categories.includes('laptop') || categories.includes('desktop'))) {
     notes.push('Port compatibility (HDMI / USB-C / DisplayPort) is not verified from listings. Please check before buying.');
   }
-  const cart = getCart(userId);
-  return { cart, items, missing, notes, budget: roundMoney(budgetUsd, 'USD'), total: cart.total, withinBudget: cart.total <= budgetUsd + 0.005 };
+
+  return {
+    goal: goal || null,
+    budget: roundMoney(budgetUsd, 'USD'),
+    baskets: merged.map(({ signature, ...rest }, index) => ({ id: `${index}-${rest.keys.join('+')}`, ...rest })),
+    notes,
+    missing,
+    plan: { lines },
+  };
+}
+
+/** Turns the basket the shopper chose into their cart (prices re-read from the server's own listing cache). */
+export function selectSetupBasket(userId, { items, strategy, goal, budget }) {
+  if (!Array.isArray(items) || !items.length || items.length > 12) throw new CartError('That basket is empty.');
+  const cached = items.map((item) => ({ item, product: getCachedProduct(String(item.productId))?.product }));
+  if (cached.some((c) => !c.product)) throw new CartError('Some listings in that basket expired. Ask Buypal to build it again.', 404);
+  clearCart(userId);
+  setCartMeta(userId, { budget: Number.isFinite(Number(budget)) ? roundMoney(Number(budget), 'USD') : null, goal: goal ? String(goal).slice(0, 200) : null });
+  for (const { item, product } of cached) {
+    addItem(userId, product.id, { role: String(item.role || '').slice(0, 40) || null, strategy: strategy ? String(strategy).slice(0, 40) : 'Smart', quantity: Math.max(1, Math.min(10, Number(item.quantity) || 1)) });
+  }
+  return getCart(userId);
 }
 
 // ---------- Natural-language cart edits ----------

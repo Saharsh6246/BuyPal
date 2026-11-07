@@ -50,19 +50,6 @@ export function parseBudget(text) {
   return null;
 }
 
-/** Delivery deadline in minutes, if the message states or implies one. */
-export function parseUrgency(text) {
-  const t = text.toLowerCase();
-  const minutes = t.match(/(\d{1,3})\s*(?:min|mins|minutes?)\b/);
-  if (minutes) return Number(minutes[1]);
-  const hours = t.match(/(\d{1,2})\s*(?:hours?|hrs?)\b/);
-  if (hours) return Number(hours[1]) * 60;
-  if (/\b(instant|instantly|right now|immediately|asap|urgent|urgently|quick(ly|est)?|fastest|super fast|as fast as possible)\b/.test(t)) return 30;
-  if (/\b(today|tonight|same day|same-day)\b/.test(t)) return 720;
-  if (/\btomorrow\b/.test(t)) return 1440;
-  return null;
-}
-
 const FILLER = new Set(['as', 'possible', 'whichever', 'store', 'stores', 'quickest', 'any', 'one', 'hi', 'hello', 'hey', 'there', 'thanks', 'thank', 'help', 'ok', 'okay', 'i', 'want', 'need', 'to', 'buy', 'get', 'order', 'please', 'a', 'an', 'the', 'some', 'for', 'me', 'my', 'under', 'below', 'within', 'in', 'of', 'and', 'with', 'delivered', 'delivery', 'deliver', 'minutes', 'minute', 'min', 'mins', 'hours', 'hour', 'now', 'asap', 'urgent', 'urgently', 'instant', 'instantly', 'quick', 'quickly', 'today', 'tonight', 'tomorrow', 'fast', 'fastest', 'cheap', 'cheapest', 'best', 'good', 'find', 'looking', 'look', 'show', 'can', 'you', 'would', 'like', 'online', 'is', 'it', 'on', 'at', 'that', 'this', 'rs', 'inr', 'usd', 'rupees', 'dollars', 'budget', 'right', 'up', 'upto', 'max', 'less', 'than', 'lakh', 'k']);
 
 /** Product words left once budget, urgency and filler are removed. Used when the message names an item Buypal has no keyword for. */
@@ -74,7 +61,6 @@ export function extractQuery(text) {
 
 export function parseRequirements(text) {
   const t = text.toLowerCase();
-  const urgency = parseUrgency(text);
   const generic = extractQuery(text);
   const noun = generic.split(' ').filter((w) => /^[a-z]{3,}$/.test(w) && !['kgs', 'ltr', 'gms', 'pack', 'litre', 'litres'].includes(w)).slice(-1)[0] || null;
   // "phone charger" is a charger, not a phone: an accessory noun wins over the device it is for.
@@ -106,7 +92,6 @@ export function parseRequirements(text) {
     budget_max: budget?.amount ?? null,
     currency: budget?.currency ?? 'USD',
     allow_over_budget: /\b(stretch|can go higher|flexible|slightly above|a bit more)\b/.test(t),
-    delivery_within_minutes: urgency,
     search_query: generic || null,
   };
 }
@@ -131,7 +116,10 @@ export function heuristicPlan(text, { cartItems = 0 } = {}) {
   }
   if (/\b(show|view|what'?s in|see)\b.*\bcart\b/.test(t)) return { type: 'cart' };
   if (/\b(build|complete|full|whole|entire|assemble)\b.*\b(setup|station|workstation|kit)\b|\bsetup\b.*\b(under|within|budget)\b/.test(t)) {
-    return { type: 'setup', goal: text.slice(0, 200), budget: req.budget_max, currency: req.currency, ...req };
+    const quality = /\b(high[- ]quality|best quality|premium|top[- ]notch|best)\b/.test(t);
+    const price = /\b(cheap|cheapest|affordable|budget|low cost|inexpensive|save money|lowest price)\b/.test(t);
+    const priority_hint = quality && price ? 'balanced' : quality ? 'quality' : price ? 'price' : undefined;
+    return { type: 'setup', goal: text.slice(0, 200), budget: req.budget_max, currency: req.currency, priority_hint, ...req };
   }
   if (/^\s*(hi|hello|hey|thanks|thank you|help|ok|okay)\b[\s!.?]*$/.test(t)) return { type: 'chat' };
   if (req.category) return { type: 'search', ...req };

@@ -1,20 +1,34 @@
 @import "tailwindcss";
 
-/* Classic editorial palette: ivory paper, ink, bottle green and brass. Hairline rules, small radii, serif display type. */
+/*
+ * Buypal design system, derived from the bag-and-check logo.
+ * Navy carries structure and text, azure is reserved for actions and key data, mist and white are the surfaces.
+ * Crisp 1px lines, modest radii, tabular numerals, and no gradients or glass effects outside the logo.
+ */
 @theme {
-  --font-sans: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
-  --font-serif: "Cormorant Garamond", Georgia, "Times New Roman", serif;
-  --color-canvas: #f4efe4;
-  --color-paper: #fbf8f1;
-  --color-ink: #1c1b18;
-  --color-muted: #6b665b;
-  --color-rule: #d9d0bd;
-  --color-brass: #8c6d3f;
-  --color-bottle: #1e3b2f;
-  --color-wine: #7a2e2e;
-  --color-sage: #3f6a4f;
-  --color-slate: #2f4a5c;
-  --animate-rise: rise 0.4s ease-out both;
+  --font-sans: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Outfit", "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+
+  --color-canvas: #f5f8fd;
+  --color-paper: #ffffff;
+  --color-mist: #eef3fc;
+  --color-ink: #0b1530;
+  --color-muted: #5b6785;
+  --color-rule: #e1e7f2;
+  --color-rule-strong: #c8d2e6;
+
+  --color-navy: #0a1f4d;
+  --color-azure: #1d63e8;
+  --color-azure-deep: #1550c4;
+  --color-sky: #58aefc;
+
+  --color-mint: #0e8f6a;
+  --color-amber: #b45309;
+  --color-berry: #b4235a;
+  --color-teal: #0e7490;
+  --color-danger: #c0392b;
+
+  --animate-rise: rise 0.35s ease-out both;
   @keyframes rise {
     from { opacity: 0; transform: translateY(6px); }
     to { opacity: 1; transform: translateY(0); }
@@ -22,28 +36,34 @@
 }
 
 html, body, #root { height: 100%; }
-body { margin: 0; background: var(--color-canvas); color: var(--color-ink); font-family: var(--font-sans); font-size: 15px; -webkit-font-smoothing: antialiased; }
-button { cursor: pointer; }
+body { margin: 0; background: var(--color-canvas); color: var(--color-ink); font-family: var(--font-sans); font-size: 15px; line-height: 1.5; -webkit-font-smoothing: antialiased; font-feature-settings: "tnum" 1; }
+button { cursor: pointer; font: inherit; }
 button:disabled { cursor: not-allowed; }
-::selection { background: #e3d6b8; }
-:focus-visible { outline: 2px solid var(--color-brass); outline-offset: 2px; }
-.scroll-thin::-webkit-scrollbar { width: 8px; }
-.scroll-thin::-webkit-scrollbar-thumb { background: #cfc5ae; }
+::selection { background: #cfe0ff; }
+:focus-visible { outline: 2px solid var(--color-azure); outline-offset: 2px; }
+.scroll-thin::-webkit-scrollbar { width: 10px; }
+.scroll-thin::-webkit-scrollbar-thumb { background: #cfd8ea; border-radius: 10px; border: 2px solid var(--color-canvas); }
 paypal-button { display: block; width: 100%; }
 
 @layer components {
-  .eyebrow { font-size: 11px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: var(--color-brass); }
-  .serif { font-family: var(--font-serif); }
-  .rule { border-color: var(--color-rule); }
-  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; border-radius: 2px; padding: 0.7rem 1.2rem; font-size: 11.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; transition: background 0.2s, color 0.2s, border-color 0.2s; }
-  .btn-primary { background: var(--color-bottle); color: #f4efe4; border: 1px solid var(--color-bottle); }
-  .btn-primary:hover:not(:disabled) { background: #14291f; }
-  .btn-primary:disabled { background: #cfc8b6; border-color: #cfc8b6; color: #8b8573; }
-  .btn-outline { background: transparent; color: var(--color-ink); border: 1px solid var(--color-ink); }
-  .btn-outline:hover:not(:disabled) { background: var(--color-ink); color: var(--color-canvas); }
-  .btn-outline:disabled { border-color: var(--color-rule); color: #9a9484; }
-  .link { color: var(--color-bottle); text-decoration: underline; text-underline-offset: 3px; text-decoration-color: #b9ae93; }
-  .link:hover { text-decoration-color: var(--color-bottle); }
-  .field { background: var(--color-paper); border: 1px solid var(--color-rule); border-radius: 2px; }
-  .field:focus-within { border-color: var(--color-ink); }
+  .display { font-family: var(--font-display); letter-spacing: -0.02em; }
+  .num { font-variant-numeric: tabular-nums; }
+  .eyebrow { font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--color-azure); }
+  .card { background: var(--color-paper); border: 1px solid var(--color-rule); border-radius: 14px; }
+  .field { background: var(--color-paper); border: 1px solid var(--color-rule-strong); border-radius: 12px; transition: border-color .15s, box-shadow .15s; }
+  .field:focus-within { border-color: var(--color-azure); box-shadow: 0 0 0 3px rgba(29, 99, 232, 0.14); }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem; border-radius: 10px; padding: 0.62rem 1.1rem; font-size: 14px; font-weight: 600; line-height: 1.2; transition: background .15s, color .15s, border-color .15s, box-shadow .15s; white-space: nowrap; }
+  .btn-primary { background: var(--color-azure); color: #fff; border: 1px solid var(--color-azure); }
+  .btn-primary:hover:not(:disabled) { background: var(--color-azure-deep); border-color: var(--color-azure-deep); }
+  .btn-primary:disabled { background: #cbd5e8; border-color: #cbd5e8; color: #fff; }
+  .btn-outline { background: var(--color-paper); color: var(--color-navy); border: 1px solid var(--color-rule-strong); }
+  .btn-outline:hover:not(:disabled) { background: var(--color-mist); border-color: var(--color-navy); }
+  .btn-outline:disabled { color: #9aa7c2; background: #f6f8fc; }
+  .btn-dark { background: var(--color-navy); color: #fff; border: 1px solid var(--color-navy); }
+  .btn-dark:hover:not(:disabled) { background: #06153a; }
+
+  .chip { display: inline-flex; align-items: center; gap: 0.4rem; border-radius: 999px; border: 1px solid var(--color-rule); background: var(--color-paper); padding: 0.18rem 0.65rem; font-size: 12px; font-weight: 600; color: var(--color-navy); }
+  .link { color: var(--color-azure); font-weight: 600; text-decoration: none; }
+  .link:hover { text-decoration: underline; text-underline-offset: 3px; }
 }

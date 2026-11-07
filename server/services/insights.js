@@ -5,7 +5,7 @@ const median = (values) => {
   const sorted = [...values].sort((a, b) => a - b);
   return sorted.length ? sorted[Math.floor((sorted.length - 1) / 2)] : null;
 };
-const BASKET = { Budget: 'Best price', Smart: 'Best overall', Premium: 'Best quality', Fastest: 'Quickest delivery' };
+const BASKET = { Budget: 'Best price', Smart: 'Best overall', Premium: 'Best quality' };
 
 /**
  * Buypal's explainable "read" on a shopper, built only from their own choices and completed orders.
@@ -37,7 +37,6 @@ export function getUserModel(userId) {
     const [top, n] = Object.entries(tally).sort((a, b) => b[1] - a[1])[0];
     lines.push(`${BASKET[top] || top} is your most chosen basket (${n} of ${totalPicks} choices).`);
   }
-  if ((tally.Fastest || 0) / Math.max(1, totalPicks) >= 0.4 && totalPicks >= 3) lines.push('You often shop against the clock, so fast delivery gets extra weight.');
   if (topCategories.length) lines.push(`You shop most for ${topCategories.map((c) => c.category).join(', ')}.`);
   if (typicalSpendUsd != null) lines.push(`Your typical item costs about $${typicalSpendUsd.toFixed(2)}.`);
   if (favouriteBrands.length) lines.push(`Brands you come back to: ${favouriteBrands.join(', ')}.`);

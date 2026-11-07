@@ -4,19 +4,19 @@ import { extractSpecs } from '../services/specs.js';
 
 // ---------------------------------------------------------------------------------------------
 // DEMO STORE FEED. Everything in this file is SIMULATED: fictional stores, fictional brands, and
-// prices / ratings / delivery times generated deterministically. It exists so the full comparison
-// (best price, best quality, best overall, quickest delivery) can be demonstrated for everyday items
+// prices and ratings generated deterministically. It exists so the full comparison
+// (best overall, best quality, best price, most loved, best deal) can be demonstrated for everyday items
 // that no free, legal API provides (Amazon, Flipkart, Blinkit and Zepto have no public product APIs).
 // Every listing is flagged `demo: true` and the UI labels it "Demo data".
 // To go live, replace this provider with real adapters that return the same listing shape.
 // ---------------------------------------------------------------------------------------------
 
 export const STORES = [
-  { id: 'quickcart', name: 'QuickCart', kind: 'instant', minutes: [8, 15], feeInr: 25, freeAboveInr: 199, factor: [1.0, 1.08], groups: ['grocery', 'household', 'personal', 'snacks', 'stationery', 'electronics'] },
-  { id: 'dashmart', name: 'DashMart', kind: 'instant', minutes: [10, 20], feeInr: 20, freeAboveInr: 149, factor: [0.97, 1.05], groups: ['grocery', 'household', 'personal', 'snacks', 'baby'] },
-  { id: 'freshslot', name: 'FreshSlot', kind: 'same-day', minutes: [120, 240], feeInr: 15, freeAboveInr: 299, factor: [0.93, 1.0], groups: ['grocery', 'household', 'personal', 'snacks', 'baby', 'pet'] },
-  { id: 'megamarket', name: 'MegaMarket', kind: 'next-day', minutes: [1200, 1680], feeInr: 40, freeAboveInr: 499, factor: [0.88, 0.97], groups: ['grocery', 'household', 'personal', 'snacks', 'stationery', 'electronics', 'baby', 'pet', 'kitchen', 'fitness'] },
-  { id: 'bazaarhub', name: 'BazaarHub', kind: 'standard', minutes: [2880, 5760], feeInr: 49, freeAboveInr: 599, factor: [0.85, 0.95], groups: ['household', 'personal', 'stationery', 'electronics', 'baby', 'pet', 'kitchen', 'fitness'] },
+  { id: 'quickcart', name: 'QuickCart', factor: [1.0, 1.08], groups: ['grocery', 'household', 'personal', 'snacks', 'stationery', 'electronics'] },
+  { id: 'dashmart', name: 'DashMart', factor: [0.97, 1.05], groups: ['grocery', 'household', 'personal', 'snacks', 'baby'] },
+  { id: 'freshslot', name: 'FreshSlot', factor: [0.93, 1.0], groups: ['grocery', 'household', 'personal', 'snacks', 'baby', 'pet'] },
+  { id: 'megamarket', name: 'MegaMarket', factor: [0.88, 0.97], groups: ['grocery', 'household', 'personal', 'snacks', 'stationery', 'electronics', 'baby', 'pet', 'kitchen', 'fitness'] },
+  { id: 'bazaarhub', name: 'BazaarHub', factor: [0.85, 0.95], groups: ['household', 'personal', 'stationery', 'electronics', 'baby', 'pet', 'kitchen', 'fitness'] },
 ];
 
 // [key, display name, group, aliases, brands, variants [label, baseInr], attributes]
@@ -63,13 +63,6 @@ const hash01 = (...parts) => parseInt(createHash('sha1').update(parts.join('|'))
 const between = (range, seed) => range[0] + (range[1] - range[0]) * seed;
 const singular = (word) => (word.length > 3 && word.endsWith('s') && !word.endsWith('ss') ? word.slice(0, -1) : word);
 
-function deliveryLabel(minutes) {
-  if (minutes < 60) return `${minutes} min`;
-  if (minutes < 1440) return `${Math.round(minutes / 60)} hr`;
-  const days = Math.round(minutes / 1440);
-  return days <= 1 ? 'Tomorrow' : `${days} days`;
-}
-
 function placeholderImage(text, tint) {
   const initials = text.split(/\s+/).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200"><rect width="200" height="200" fill="${tint}"/><text x="100" y="118" text-anchor="middle" font-family="Georgia,serif" font-size="64" fill="#1c1b18" opacity="0.55">${initials}</text></svg>`;
@@ -99,11 +92,9 @@ function buildCatalog() {
           if (hash01('stock', skuId, store.id) < 0.12) continue; // not every store carries every item
           const factor = between(store.factor, hash01('price', skuId, store.id));
           const priceInr = Math.max(5, Math.round(baseInr * brandPriceFactor * factor));
-          const minutes = Math.round(between(store.minutes, hash01('eta', skuId, store.id)));
-          const fee = priceInr >= store.freeAboveInr ? 0 : store.feeInr;
           const onSale = hash01('sale', skuId, store.id) < 0.25;
           const regularInr = onSale ? Math.round(priceInr / (1 - (0.08 + hash01('pct', skuId, store.id) * 0.17))) : null;
-          stocked.push({ store, priceInr, minutes, fee, regularInr });
+          stocked.push({ store, priceInr, regularInr });
         }
         if (!stocked.length) return;
         const offers = stocked.map((s) => ({
@@ -115,7 +106,6 @@ function buildCatalog() {
           availability: 'InStock',
           condition: 'new',
           demo: true,
-          delivery: { minutes: s.minutes, label: deliveryLabel(s.minutes), kind: s.store.kind, feeInr: s.fee, feeUsd: Math.round((s.fee / inrPerUsd) * 100) / 100 },
         })).sort((a, b) => a.price - b.price);
         skus.push({ skuId, key, aliasSet: new Set([...aliases, ...key.split(' '), ...baseName.toLowerCase().split(/\s+/)]), searchTokens: new Set(searchText.toLowerCase().match(/[a-z0-9]+/g)), group });
 
@@ -145,7 +135,6 @@ function buildCatalog() {
             specs: extractSpecs(searchText),
             source: 'Demo',
             demo: true,
-            delivery: { minutes: s.minutes, label: deliveryLabel(s.minutes), kind: s.store.kind, feeInr: s.fee, feeUsd: Math.round((s.fee / inrPerUsd) * 100) / 100 },
             offers,
           });
         }

@@ -1,13 +1,15 @@
 import { useState } from 'react';
 import { api, inr, money } from '../api.js';
+import { BUCKETS } from '../buckets.js';
+import { IconArrowRight, IconSearch, IconShield } from './icons.jsx';
 import { DemoBadge } from './ProductCard.jsx';
 import PriorityPicker from './PriorityPicker.jsx';
 
 const EXAMPLES = [
-  'Salted butter 500 g delivered within 15 minutes',
-  'A 20W phone charger, as fast as possible',
   'A lightweight laptop for college under ₹60,000',
-  'Build me a complete gaming setup under ₹1,00,000',
+  'A 20W phone charger from a store I can trust',
+  'Salted butter 500 g, best price',
+  'Build me a high quality yet affordable gaming setup under ₹1,00,000',
 ];
 
 function Tile({ item, inCart, onAdded, onSearch }) {
@@ -19,91 +21,122 @@ function Tile({ item, inCart, onAdded, onSearch }) {
     setError('');
     try { onAdded(await api.addToCart(product.id, null, item.category)); } catch (e) { setError(e.message); } finally { setBusy(false); }
   };
-  const offers = (product.offers || []).length;
+  const stores = (product.offers || []).length;
   return (
-    <article className="flex flex-col border border-rule bg-paper animate-rise">
-      <div className="flex h-40 items-center justify-center border-b border-rule bg-white p-3">
+    <article className="card flex flex-col overflow-hidden animate-rise">
+      <div className="relative flex h-44 items-center justify-center border-b border-rule bg-paper p-4">
         {product.image ? <img src={product.image} alt={product.name} loading="lazy" className="max-h-full max-w-full object-contain" /> : <span className="text-xs text-muted">Image unavailable</span>}
+        <span className="chip absolute left-3 top-3">{item.label}</span>
+        {product.demo && <span className="absolute right-3 top-3"><DemoBadge /></span>}
       </div>
       <div className="flex flex-1 flex-col gap-1.5 p-4">
-        <div className="flex items-center justify-between"><p className="eyebrow">{item.label}</p>{product.demo && <DemoBadge />}</div>
-        <h3 className="serif line-clamp-2 text-[19px] font-semibold leading-tight">{product.name}</h3>
-        <p className="serif text-2xl font-semibold">{money(product.price)} <span className="font-sans text-xs font-normal text-muted">{inr(product.price)}</span> {product.compareAtPrice && <s className="ml-1 text-sm font-normal text-muted">{money(product.compareAtPrice)}</s>}</p>
-        <p className="text-[12px] leading-snug text-muted">{item.reason}</p>
-        <p className="text-[11.5px] text-muted">{product.merchant || 'Retailer not listed'}{offers > 1 ? ` · ${offers} stores` : ''}{product.delivery ? ` · ${product.delivery.label}` : ''}</p>
-        <div className="mt-auto flex items-center justify-between pt-3 text-[12px]">
-          <button type="button" className="link" onClick={() => onSearch(item.category)}>Compare stores</button>
-          <button type="button" className="btn btn-outline !px-3 !py-1.5" disabled={busy || inCart} onClick={add}>{inCart ? 'In cart' : busy ? '…' : 'Add'}</button>
+        <h3 className="display line-clamp-2 text-[17px] font-medium leading-snug text-navy">{product.name}</h3>
+        <p className="num flex items-baseline gap-2"><span className="display text-2xl font-semibold text-navy">{money(product.price)}</span><span className="text-xs text-muted">{inr(product.price)}</span>{product.compareAtPrice && <s className="text-xs text-muted">{money(product.compareAtPrice)}</s>}</p>
+        <p className="text-[12.5px] leading-snug text-muted">{item.reason}</p>
+        <p className="text-xs text-muted">{product.merchant || 'Retailer not listed'}{stores > 1 ? ` · ${stores} stores` : ''}</p>
+        <div className="mt-auto flex items-center justify-between pt-3">
+          <button type="button" className="link text-[13px]" onClick={() => onSearch(item.category)}>Compare options</button>
+          <button type="button" className="btn btn-outline !px-3 !py-1.5 !text-[13px]" disabled={busy || inCart} onClick={add}>{inCart ? 'In cart' : busy ? '…' : 'Add'}</button>
         </div>
-        {error && <p className="text-xs text-wine">{error}</p>}
+        {error && <p className="text-xs text-danger">{error}</p>}
       </div>
     </article>
   );
 }
 
-export default function Home({ home, loading, priority, onPriority, cartIds, onCart, onSearch, rejectReasons }) {
+export default function Home({ home, loading, priority, onPriority, cartIds, onCart, onSearch }) {
   const [draft, setDraft] = useState('');
   const submit = (e) => { e.preventDefault(); if (draft.trim().length >= 2) onSearch(draft); };
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 pb-16 pt-10 sm:px-6">
-      <section className="mx-auto max-w-3xl text-center animate-rise">
-        <p className="eyebrow">Your personal shopping desk</p>
-        <h1 className="serif mt-3 text-5xl font-semibold leading-[1.05] sm:text-7xl">What shall we find<br className="hidden sm:block" /> for you today?</h1>
-        <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-muted">Describe anything you want, from groceries delivered in minutes to a new laptop. Buypal compares stores and sorts the options into baskets (best price, best quality, best overall, quickest delivery), arranged around how you actually shop.</p>
-        <form onSubmit={submit} className="field mx-auto mt-8 flex max-w-2xl items-center gap-2 p-1.5">
-          <label htmlFor="home-search" className="sr-only">What would you like to buy?</label>
-          <input id="home-search" value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={1000} autoComplete="off"
-            placeholder="Describe what you need, e.g. organic milk 1 litre in 10 minutes" className="min-w-0 flex-1 bg-transparent px-3 py-3 text-[15px] outline-none placeholder:text-muted/70" />
-          <button type="submit" className="btn btn-primary" disabled={draft.trim().length < 2}>Search</button>
-        </form>
-        <ul className="mx-auto mt-5 max-w-2xl space-y-1 text-left text-[13.5px]">
-          {EXAMPLES.map((example) => (
-            <li key={example}><button type="button" onClick={() => onSearch(example)} className="group flex w-full items-center justify-between border-b border-rule py-2 text-muted transition hover:text-ink"><span>{example}</span><span className="text-brass transition group-hover:translate-x-0.5">→</span></button></li>
-          ))}
-        </ul>
+    <div className="pb-20">
+      <section className="border-b border-rule bg-paper">
+        <div className="mx-auto grid max-w-7xl items-center gap-10 px-4 py-14 sm:px-6 lg:grid-cols-[1.15fr_0.85fr] lg:py-20">
+          <div className="animate-rise">
+            <p className="eyebrow">Personal shopping agent</p>
+            <h1 className="display mt-3 text-[40px] font-semibold leading-[1.06] text-navy sm:text-6xl">Find the best version of anything you want to buy.</h1>
+            <p className="mt-5 max-w-xl text-[17px] leading-relaxed text-muted">Describe it in your own words. Buypal compares stores, explains every pick, and arranges the options around how you shop. You finish the purchase at the retailer you choose.</p>
+            <form onSubmit={submit} className="field mt-8 flex max-w-2xl items-center gap-2 p-1.5 pl-4">
+              <IconSearch size={20} className="flex-none text-muted" />
+              <label htmlFor="home-search" className="sr-only">What would you like to buy?</label>
+              <input id="home-search" value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={1000} autoComplete="off"
+                placeholder="Describe what you need, e.g. organic honey 250 g" className="min-w-0 flex-1 bg-transparent px-1 py-3 text-[16px] outline-none placeholder:text-muted/70" />
+              <button type="submit" className="btn btn-primary !py-3" disabled={draft.trim().length < 2}>Search</button>
+            </form>
+            <div className="mt-4 flex max-w-2xl flex-wrap gap-2">
+              {EXAMPLES.map((example) => (
+                <button key={example} type="button" onClick={() => onSearch(example)} className="chip !font-medium !text-muted transition hover:border-azure hover:!text-azure">{example}</button>
+              ))}
+            </div>
+          </div>
+
+          <aside className="card p-6 shadow-[0_8px_30px_-12px_rgba(10,31,77,0.18)]" aria-label="How Buypal ranks products">
+            <p className="eyebrow">How Buypal chooses</p>
+            <h2 className="display mt-1 text-2xl font-semibold text-navy">Six ways to decide</h2>
+            <ul className="mt-4 divide-y divide-rule">
+              {Object.values(BUCKETS).map((b) => (
+                <li key={b.label} className="flex items-start gap-3 py-3">
+                  <span className="mt-1.5 h-2.5 w-2.5 flex-none rounded-full" style={{ background: b.color }} />
+                  <span><span className="block text-[14.5px] font-semibold text-navy">{b.label}</span><span className="block text-[13px] leading-snug text-muted">{b.blurb}</span></span>
+                </li>
+              ))}
+            </ul>
+            <p className="mt-3 flex items-start gap-2 border-t border-rule pt-3 text-xs leading-snug text-muted"><IconShield size={16} className="mt-0.5 flex-none text-mint" />Ranked by transparent rules on real listing data. The AI explains the results but never ranks products or touches payments.</p>
+          </aside>
+        </div>
       </section>
 
-      <section className="mx-auto mt-12 max-w-4xl border-y border-rule py-8">
-        {priority ? (
-          <div className="flex flex-col items-center gap-3 text-center sm:flex-row sm:justify-between sm:text-left">
-            <div><p className="eyebrow">What matters most to you</p><p className="serif text-2xl font-semibold">Your priority</p></div>
-            <PriorityPicker variant="segmented" value={priority} onChange={onPriority} />
-          </div>
-        ) : (
-          <div>
-            <div className="mb-4 text-center"><p className="eyebrow">Before we begin</p><h2 className="serif text-4xl font-semibold">What matters most to you?</h2><p className="mt-1 text-[14px] text-muted">Buypal will lead with this every time. You can change it whenever you like.</p></div>
-            <PriorityPicker value={priority} onChange={onPriority} />
+      <div className="mx-auto max-w-7xl px-4 sm:px-6">
+        <section className="mt-10">
+          {priority ? (
+            <div className="flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+              <div><p className="eyebrow">Your priority</p><p className="display text-xl font-semibold text-navy">What matters most to you</p></div>
+              <PriorityPicker variant="segmented" value={priority} onChange={onPriority} />
+            </div>
+          ) : (
+            <div className="card p-6">
+              <p className="eyebrow">Before you begin</p>
+              <h2 className="display mt-1 text-2xl font-semibold text-navy">What matters most to you?</h2>
+              <p className="mb-4 mt-1 text-[14px] text-muted">Buypal leads with this every time. You can change it whenever you like.</p>
+              <PriorityPicker value={priority} onChange={onPriority} />
+            </div>
+          )}
+        </section>
+
+        {home?.recent?.length > 0 && (
+          <section className="mt-8">
+            <p className="eyebrow !text-muted">Continue where you left off</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {home.recent.map((q) => <button key={q} type="button" onClick={() => onSearch(q)} className="chip transition hover:border-azure hover:text-azure">{q}</button>)}
+            </div>
+          </section>
+        )}
+
+        {loading && !home && (
+          <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4" aria-label="Loading recommendations">
+            {[0, 1, 2, 3].map((i) => <div key={i} className="card h-72 animate-pulse bg-mist" />)}
           </div>
         )}
-      </section>
+        {home?.sections.map((section) => (
+          <section key={section.id} className="mt-12">
+            <div className="mb-5 flex items-end justify-between gap-4">
+              <div>
+                <h2 className="display text-2xl font-semibold text-navy sm:text-[28px]">{section.title}</h2>
+                <p className="mt-1 text-[14px] text-muted">{section.subtitle}</p>
+              </div>
+              <IconArrowRight size={20} className="hidden text-rule-strong sm:block" />
+            </div>
+            <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {section.items.map((item) => <Tile key={`${section.id}-${item.product.id}`} item={item} inCart={cartIds.has(item.product.id)} onAdded={onCart} onSearch={onSearch} />)}
+            </div>
+          </section>
+        ))}
+        {home && home.sections.length === 0 && !loading && <p className="mt-12 text-center text-muted">Recommendations will appear here once you search for something.</p>}
+      </div>
 
-      {home?.recent?.length > 0 && (
-        <section className="mt-10">
-          <p className="eyebrow mb-3 !text-muted">Continue where you left off</p>
-          <div className="flex flex-wrap gap-2">
-            {home.recent.map((q) => <button key={q} type="button" onClick={() => onSearch(q)} className="border border-rule bg-paper px-3 py-1.5 text-[13px] hover:border-ink">{q}</button>)}
-          </div>
-        </section>
-      )}
-
-      {loading && !home && (
-        <div className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4" aria-label="Loading recommendations">
-          {[0, 1, 2, 3].map((i) => <div key={i} className="h-72 animate-pulse border border-rule bg-paper" />)}
-        </div>
-      )}
-      {home?.sections.map((section) => (
-        <section key={section.id} className="mt-14">
-          <div className="mb-5 border-b border-rule pb-3">
-            <h2 className="serif text-4xl font-semibold">{section.title}</h2>
-            <p className="mt-1 text-[13.5px] text-muted">{section.subtitle}</p>
-          </div>
-          <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {section.items.map((item) => <Tile key={`${section.id}-${item.product.id}`} item={item} inCart={cartIds.has(item.product.id)} onAdded={onCart} onSearch={onSearch} rejectReasons={rejectReasons} />)}
-          </div>
-        </section>
-      ))}
-      {home && home.sections.length === 0 && !loading && <p className="mt-12 text-center text-muted">Recommendations will appear here once you search for something.</p>}
+      <footer className="mx-auto mt-20 max-w-7xl border-t border-rule px-4 pt-6 text-xs leading-relaxed text-muted sm:px-6">
+        Prices and availability are shown as listed by the retailer and can change. Buypal compares and recommends; you complete purchases at the retailer. The in-app checkout is a PayPal Sandbox demonstration: no real money moves and no retailer order is created.
+      </footer>
     </div>
   );
 }

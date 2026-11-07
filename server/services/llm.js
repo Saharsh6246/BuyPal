@@ -40,7 +40,9 @@ export async function chatCompletion({ messages, tools }) {
       method: 'POST',
       headers: { 'content-type': 'application/json', authorization: `Bearer ${config.groqApiKey}` },
       body: JSON.stringify({
-        model: config.groqModel, messages, tools, tool_choice: 'auto', temperature: 0.2, max_tokens: 700,
+        model: config.groqModel, messages, tools, tool_choice: 'auto', temperature: 0.2, max_tokens: 1500,
+        // gpt-oss models "think" before answering; keep that short so replies stay fast and within the free token limits.
+        ...(/gpt-oss/.test(config.groqModel) ? { reasoning_effort: 'low' } : {}),
       }),
       signal: AbortSignal.timeout(30000),
     });

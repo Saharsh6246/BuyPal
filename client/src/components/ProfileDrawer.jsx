@@ -12,7 +12,7 @@ export default function ProfileDrawer({ open, onClose, priority, onPriority, onR
     api.insights().then(setInsights).catch(() => {});
   };
   useEffect(() => { if (open) load(); }, [open, priority]);
-  const BASKETS = [['Budget', 'Best price'], ['Smart', 'Best overall'], ['Premium', 'Best quality'], ['Fastest', 'Quickest delivery']];
+  const BASKETS = [['Budget', 'Best price'], ['Smart', 'Best overall'], ['Premium', 'Best quality']];
 
   const change = async (row, score) => {
     try { setData(await api.setPreference({ scope: row.scope, dimension: row.dimension, key: row.key, score })); } catch (e) { setError(e.message); }
@@ -30,13 +30,13 @@ export default function ProfileDrawer({ open, onClose, priority, onPriority, onR
 
   return (
     <>
-      {open && <div className="fixed inset-0 z-30 bg-ink/40" onClick={onClose} />}
+      {open && <div className="fixed inset-0 z-30 bg-navy/40" onClick={onClose} />}
       <aside aria-label="Your shopping profile" aria-hidden={!open}
         className={`fixed right-0 top-0 z-40 flex h-full w-full max-w-md flex-col border-l border-rule bg-paper transition-transform duration-300 ${open ? 'translate-x-0' : 'invisible translate-x-full'}`}>
         <div className="flex items-start justify-between border-b border-rule p-5">
           <div>
             <p className="eyebrow">Your shopping profile</p>
-            <h2 className="serif text-3xl font-semibold">What Buypal has learned</h2>
+            <h2 className="display text-3xl font-semibold">What Buypal has learned</h2>
           </div>
           <button type="button" onClick={onClose} aria-label="Close profile" className="text-2xl leading-none text-muted hover:text-ink">×</button>
         </div>
@@ -59,7 +59,7 @@ export default function ProfileDrawer({ open, onClose, priority, onPriority, onR
                       return (
                         <li key={key} className="flex items-center gap-3 text-[13px]">
                           <span className="w-32 flex-none">{label}</span>
-                          <span className="h-[5px] flex-1 bg-rule"><span className="block h-full bg-bottle" style={{ width: `${Math.round((n / insights.totalPicks) * 100)}%` }} /></span>
+                          <span className="h-[5px] flex-1 bg-rule"><span className="block h-full bg-azure" style={{ width: `${Math.round((n / insights.totalPicks) * 100)}%` }} /></span>
                           <span className="w-6 text-right text-muted">{n}</span>
                         </li>
                       );
@@ -71,7 +71,7 @@ export default function ProfileDrawer({ open, onClose, priority, onPriority, onR
               )}
             </section>
           )}
-          {data.summary.length > 0 && <ul className="space-y-1 border-l-2 border-brass bg-canvas px-4 py-3 text-[13px]">{data.summary.map((line) => <li key={line}>{line}</li>)}</ul>}
+          {data.summary.length > 0 && <ul className="space-y-1 border-l-2 border-azure bg-canvas px-4 py-3 text-[13px]">{data.summary.map((line) => <li key={line}>{line}</li>)}</ul>}
           <p className="text-[13px] leading-relaxed text-muted">Buypal learns from what you search, add, like, reject and buy. Nothing is hidden: review, correct or reset it below. Brand preferences can differ by category.</p>
           {data.preferences.length === 0 && <p className="border border-rule bg-canvas p-4 text-muted">Nothing learned yet. Add a pick to your cart or choose “Like” on a recommendation.</p>}
           {Object.entries(groups).map(([scope, rows]) => (
@@ -81,20 +81,20 @@ export default function ProfileDrawer({ open, onClose, priority, onPriority, onR
                 {rows.map((row) => (
                   <li key={`${row.scope}-${row.dimension}-${row.key}`} className="flex items-center justify-between border border-rule px-3 py-2">
                     <div>
-                      <p className="serif text-lg font-semibold capitalize">{row.dimension === 'brand' ? row.key : `${{ Budget: 'Price', Premium: 'Quality', Smart: 'Overall value', Fastest: 'Speed' }[row.key] || row.key} focus`}</p>
+                      <p className="display text-lg font-semibold capitalize">{row.dimension === 'brand' ? row.key : `${{ Budget: 'Price', Premium: 'Quality', Smart: 'Overall value' }[row.key] || row.key} focus`}</p>
                       <p className="text-[11.5px] text-muted">{row.dimension} · {row.score > 0 ? 'you lean towards this' : 'less preferred'} ({row.score > 0 ? '+' : ''}{Math.round(row.score * 10) / 10})</p>
                     </div>
                     <div className="flex items-center gap-1">
                       <button type="button" aria-label="Decrease" className="h-7 w-7 border border-rule hover:border-ink" onClick={() => change(row, row.score - 1)}>−</button>
                       <button type="button" aria-label="Increase" className="h-7 w-7 border border-rule hover:border-ink" onClick={() => change(row, row.score + 1)}>+</button>
-                      <button type="button" aria-label="Remove" className="h-7 w-7 text-muted hover:text-wine" onClick={() => change(row, 0)}>×</button>
+                      <button type="button" aria-label="Remove" className="h-7 w-7 text-muted hover:text-danger" onClick={() => change(row, 0)}>×</button>
                     </div>
                   </li>
                 ))}
               </ul>
             </section>
           ))}
-          {error && <p className="border-l-2 border-wine bg-paper px-3 py-2 text-xs text-wine">{error}</p>}
+          {error && <p className="border-l-2 border-danger bg-paper px-3 py-2 text-xs text-danger">{error}</p>}
         </div>
         <div className="border-t border-rule p-5">
           <button type="button" onClick={reset} className="btn btn-outline w-full">Reset what Buypal has learned</button>

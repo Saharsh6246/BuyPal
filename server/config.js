@@ -22,8 +22,11 @@ export const config = {
   paypalClientId: process.env.PAYPAL_CLIENT_ID || '',
   paypalClientSecret: process.env.PAYPAL_CLIENT_SECRET || '',
   paypalBase: 'https://api-m.sandbox.paypal.com', // Sandbox only. Never point this at production without a security review.
+  serpApiKey: process.env.SERPAPI_KEY || '',
+  // Hard stop for Google Shopping calls per calendar month (the free plan is small), so it can never exceed its quota.
+  serpApiMonthlyLimit: num(process.env.SERPAPI_MONTHLY_LIMIT, 200),
   groqApiKey: process.env.GROQ_API_KEY || '',
-  groqModel: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+  groqModel: process.env.GROQ_MODEL || 'openai/gpt-oss-120b',
   // Hard stop: once this many LLM calls were made today, Buypal stops calling the model (no billing can occur).
   llmDailyLimit: num(process.env.LLM_DAILY_LIMIT, 600),
   // Channel3 prices are in USD. INR budgets are converted with this approximate, configurable rate.
