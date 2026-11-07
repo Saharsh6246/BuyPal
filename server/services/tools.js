@@ -1,6 +1,7 @@
 import { fmtUsd, toUsd } from '../lib/money.js';
 import { Channel3Error } from './channel3.js';
 import { addItem, CartError, getCart, removeItem, setQuantity } from './cartService.js';
+import { userModelForLlm } from './insights.js';
 import { recordSearch } from './interests.js';
 import { setPreference } from './preferences.js';
 import { findProducts, normalizeRequirements } from './recommend.js';
@@ -17,12 +18,14 @@ export const TOOL_DEFINITIONS = [
     type: 'function',
     function: {
       name: 'find_products',
-      description: 'Search real product listings and return Budget / Smart / Premium picks scored by Buypal. Use for any request to find or compare one kind of product.',
+      description: 'Compare listings across online stores for ANY product (groceries, household, electronics, personal care, stationery...) and return baskets scored by Buypal: best price, best quality, best overall and quickest delivery. Call once per distinct item the user wants.',
       parameters: {
         type: 'object',
         properties: {
-          category: str('Singular product type, e.g. laptop, monitor, mouse, keyboard, headphones'),
-          must_have: strList('Essential requirements, short phrases, e.g. gaming, wireless, 16gb ram, 4k, mechanical'),
+          category: str('Short singular noun for the product type, e.g. butter, phone charger, notebook, laptop'),
+          search_query: str("A concise search phrase capturing the user's detailed description: brand, size, variant (e.g. 'salted butter 500g')"),
+          delivery_within_minutes: { type: 'number', description: 'If the user needs it quickly: the maximum delivery time in minutes (e.g. 30 for "within 30 minutes", 15 for "instantly/now")' },
+          must_have: strList("Essential requirements, short phrases, e.g. wireless, organic, 500 g (always include a stated pack size like '500 g' or '1 litre'), 16gb ram, 4k"),
           nice_to_have: strList('Secondary preferences, e.g. lightweight, long battery, rgb'),
           budget_max: { type: 'number', description: 'Maximum price the user stated, in their currency' },
           currency: str('Currency of budget_max: USD or INR'),
@@ -99,6 +102,8 @@ export const TOOL_DEFINITIONS = [
 const compactCard = (card) => ({
   strategy: card.label, product_id: card.product.id, name: card.product.name, brand: card.product.brand,
   price_usd: card.product.price, rating: card.product.rating ? `${card.product.rating.value}/5 (${card.product.rating.count})` : 'not listed',
+  store: card.product.merchant, delivery: card.product.delivery ? card.product.delivery.label : 'not reported',
+  demo_data: Boolean(card.product.demo),
   specs: card.product.specChips.slice(0, 4), why: card.position, pros: card.pros, cons: card.cons,
 });
 
@@ -128,8 +133,8 @@ async function runToolInner(ctx, name, args) {
       if (!req.category && !req.query) return { result: { error: 'A product category is required.' } };
       const outcome = await findProducts(userId, req);
       recordSearch(userId, { query: args.search_query || [...req.mustHave, req.category].join(' '), category: req.category, budgetUsd: req.budgetMax });
-      blocks.push({ type: 'recommendations', category: req.category, budgetUsd: req.budgetMax, requirements: { mustHave: req.mustHave, niceToHave: req.niceToHave }, cards: outcome.cards, notes: outcome.notes, stats: outcome.stats, cheapest: outcome.cheapest || null, profileUsed: outcome.profileUsed });
-      return { result: { found: outcome.stats.found, considered: outcome.stats.considered, notes: outcome.notes, options: outcome.cards.map(compactCard), cheapest_available: outcome.cheapest ? { name: outcome.cheapest.name, price_usd: outcome.cheapest.price } : undefined } };
+      blocks.push({ type: 'recommendations', category: req.category, budgetUsd: req.budgetMax, maxDeliveryMinutes: req.maxDeliveryMinutes, requirements: { mustHave: req.mustHave, niceToHave: req.niceToHave }, cards: outcome.cards, notes: outcome.notes, stats: outcome.stats, cheapest: outcome.cheapest || null, profileUsed: outcome.profileUsed, basketPlan: outcome.basketPlan || null });
+      return { result: { found: outcome.stats.found, considered: outcome.stats.considered, notes: outcome.notes, baskets: outcome.cards.map(compactCard), why_these_baskets_for_this_shopper: outcome.basketPlan?.lines, shopper: userModelForLlm(userId), cheapest_available: outcome.cheapest ? { name: outcome.cheapest.name, price_usd: outcome.cheapest.price } : undefined } };
     }
 
     if (name === 'build_setup') {

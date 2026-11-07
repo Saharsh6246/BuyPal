@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { api } from './api.js';
+import { api, setInrRate } from './api.js';
 import { CartBlock, Recommendations } from './components/Blocks.jsx';
 import CartDrawer from './components/CartDrawer.jsx';
 import Home from './components/Home.jsx';
@@ -38,7 +38,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    api.config().then(setConfig).catch(() => setError('Cannot reach the Buypal server. Is it running?'));
+    api.config().then((c) => { setInrRate(c.inrPerUsd); setConfig(c); }).catch(() => setError('Cannot reach the Buypal server. Is it running?'));
     api.me().then((m) => setPriority(m.priority)).catch(() => {});
     api.history().then((d) => setMessages(d.messages)).catch(() => {});
     api.cart().then(setCart).catch(() => {});

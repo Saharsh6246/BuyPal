@@ -73,10 +73,13 @@ export function normalizeProduct(raw) {
     searchText: searchText.slice(0, 4000),
     specs: extractSpecs(searchText),
     source: 'Channel3',
+    demo: false,
+    groupId: String(raw.id),
+    delivery: null, // Channel3 does not provide delivery times, so none are claimed.
   };
 }
 
-function saveProduct(product) {
+export function saveProduct(product) {
   run('INSERT OR REPLACE INTO products (id, json, fetched_at) VALUES (?, ?, ?)', product.id, JSON.stringify(product), Date.now());
 }
 

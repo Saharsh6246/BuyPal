@@ -1,5 +1,5 @@
 import { toUsd } from '../lib/money.js';
-import { searchProducts } from './channel3.js';
+import { searchCatalog } from './catalog.js';
 import { getProfile } from './preferences.js';
 import { buildRecommendations, filterCandidates, plausibleFloor } from './scoring.js';
 
@@ -25,6 +25,7 @@ export function normalizeRequirements(args = {}) {
     preferredBrands: list(args.preferred_brands),
     excludedBrands: list(args.excluded_brands),
     allowOverBudget: Boolean(args.allow_over_budget),
+    maxDeliveryMinutes: Number(args.delivery_within_minutes) > 0 ? Math.min(10080, Math.round(Number(args.delivery_within_minutes))) : null,
     gaming: mustHave.includes('gaming') || list(args.nice_to_have).includes('gaming'),
     budgetNote,
   };
@@ -43,7 +44,7 @@ export async function gatherProducts(req) {
   const floor = plausibleFloor(req) || undefined;
   const merged = new Map();
   for (const query of queriesFor(req)) {
-    const products = await searchProducts({ query, limit: 30, minPrice: floor, maxPrice: ceiling });
+    const products = await searchCatalog({ query, limit: 30, minPrice: floor, maxPrice: ceiling });
     products.forEach((p) => merged.set(p.id, p));
     if (filterCandidates([...merged.values()], req).pool.length >= 8) break;
   }

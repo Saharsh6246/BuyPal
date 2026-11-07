@@ -3,7 +3,8 @@ import { config, hasPaypal } from '../config.js';
 import { all, get, run } from '../db.js';
 import { paypalMoney } from '../lib/money.js';
 import { cartFingerprint, clearCart, getCart } from './cartService.js';
-import { getCachedProduct, refreshProduct } from './channel3.js';
+import { getCachedProduct } from './channel3.js';
+import { refreshListing as refreshProduct } from './catalog.js';
 import { recordEvent } from './preferences.js';
 
 // PayPal Sandbox Orders v2. The server owns every amount; the browser only ever receives an order id.

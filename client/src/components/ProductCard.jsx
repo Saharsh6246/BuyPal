@@ -1,7 +1,13 @@
 import { useState } from 'react';
-import { api, money } from '../api.js';
+import { api, inr, money } from '../api.js';
 
-const ACCENT = { Budget: 'border-t-bottle text-bottle', Smart: 'border-t-brass text-brass', Premium: 'border-t-ink text-ink', 'Top rated': 'border-t-sage text-sage', Stretch: 'border-t-wine text-wine' };
+export function DemoBadge() {
+  return <span title="Simulated prices, ratings and delivery times from the demo store feed. Not a real retailer listing." className="border border-brass px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-widest text-brass">Demo data</span>;
+}
+
+export const deliveryLine = (delivery) => (delivery ? `Delivers in about ${delivery.label}${delivery.feeInr > 0 ? ` · delivery fee ₹${delivery.feeInr}` : ' · free delivery'}` : null);
+
+const ACCENT = { Fastest: 'border-t-slate text-slate', Budget: 'border-t-bottle text-bottle', Smart: 'border-t-brass text-brass', Premium: 'border-t-ink text-ink', 'Top rated': 'border-t-sage text-sage', Stretch: 'border-t-wine text-wine' };
 const accent = (card) => ACCENT[card.strategies[0].replace(' alt', '')] || 'border-t-muted text-muted';
 
 export function OfferList({ product }) {
@@ -15,7 +21,10 @@ export function OfferList({ product }) {
       <ul className="mt-2 divide-y divide-rule border border-rule bg-paper">
         {offers.map((offer, index) => (
           <li key={`${offer.merchant}-${index}`} className="flex items-center justify-between gap-3 px-3 py-2">
-            <span className="truncate">{offer.merchant || 'Retailer'}{index === 0 && <span className="ml-2 text-[10px] font-semibold uppercase tracking-widest text-bottle">Lowest</span>}</span>
+            <span className="min-w-0">
+              <span className="block truncate">{offer.merchant || 'Retailer'}{index === 0 && <span className="ml-2 text-[10px] font-semibold uppercase tracking-widest text-bottle">Lowest</span>}</span>
+              {offer.delivery && <span className="block text-[11.5px] text-slate">{offer.delivery.label}{offer.delivery.feeInr > 0 ? ` · fee ₹${offer.delivery.feeInr}` : ' · free delivery'}</span>}
+            </span>
             <span className="flex flex-none items-center gap-3">
               <b className="serif text-[17px]">{money(offer.price)}</b>
               {/^https?:\/\//.test(offer.url) && <a href={offer.url} target="_blank" rel="noopener noreferrer" className="link text-[11.5px]">View</a>}
@@ -66,7 +75,10 @@ export default function ProductCard({ card, category, inCart, onAdded, onBuyNow,
     <article className={`flex flex-col border border-rule border-t-[3px] bg-paper animate-rise ${accent(card)}`}>
       <div className="flex items-center justify-between px-4 pt-3">
         <span className="eyebrow !text-inherit">{card.label}</span>
-        {product.rating && <span className="text-[12px] text-muted">{product.rating.value} / 5 · {product.rating.count}</span>}
+        <span className="flex items-center gap-2">
+          {product.demo && <DemoBadge />}
+          {product.rating && <span className="text-[12px] text-muted">{product.rating.value} / 5 · {product.rating.count}</span>}
+        </span>
       </div>
       <div className="mx-4 mt-3 flex h-44 items-center justify-center border border-rule bg-white p-3">
         {product.image && !imageFailed
@@ -80,17 +92,25 @@ export default function ProductCard({ card, category, inCart, onAdded, onBuyNow,
         </div>
         <div className="flex items-baseline gap-3">
           <span className="serif text-3xl font-semibold">{money(product.price)}</span>
+          <span className="text-xs text-muted">{inr(product.price)}</span>
           {discount >= 5 && <span className="text-xs text-muted"><s>{money(product.compareAtPrice)}</s> <b className="text-bottle">{discount}% off</b></span>}
         </div>
-        <p className="text-[12px] text-muted">
-          {product.merchant || 'Retailer not listed'}
-          {product.availability ? ` · ${product.availability.replace(/([a-z])([A-Z])/g, '$1 $2')}` : ''}
-          {!product.rating && ' · No ratings listed'}
+        <p className="text-[12.5px]">
+          <b className="font-semibold">{product.merchant || 'Retailer not listed'}</b>
+          <span className="text-muted">
+            {product.availability ? ` · ${product.availability.replace(/([a-z])([A-Z])/g, '$1 $2')}` : ''}
+            {!product.rating && ' · No ratings listed'}
+          </span>
         </p>
+        {product.delivery
+          ? <p className="text-[13px] text-slate"><b>{deliveryLine(product.delivery)}</b></p>
+          : <p className="text-[12px] italic text-muted">Delivery time not reported by this retailer</p>}
         <OfferList product={product} />
         {product.specChips.length > 0
           ? <p className="border-y border-rule py-2 text-[12.5px] leading-relaxed">{product.specChips.join('  ·  ')}</p>
-          : <p className="border-y border-rule py-2 text-[12.5px] italic text-muted">Specifications not listed by the retailer</p>}
+          : product.features?.length > 0
+            ? <p className="border-y border-rule py-2 text-[12.5px] leading-relaxed">{[...(product.attributes || []), ...product.features].slice(0, 5).join('  ·  ')}</p>
+            : <p className="border-y border-rule py-2 text-[12.5px] italic text-muted">Specifications not listed by the retailer</p>}
 
         <p className="text-[13px] leading-relaxed"><span className="serif text-[15px] font-semibold italic">Why this one. </span>{card.position}</p>
         {card.matches.length > 0 && <ul className="space-y-0.5 text-[12.5px] text-sage">{card.matches.map((m) => <li key={m}>— {m}</li>)}</ul>}
@@ -107,7 +127,7 @@ export default function ProductCard({ card, category, inCart, onAdded, onBuyNow,
             <button type="button" className="btn btn-outline" disabled={!!busy || inCart} onClick={() => add(false)}>{inCart ? 'In cart' : busy === 'add' ? 'Adding…' : 'Add to cart'}</button>
           </div>
           <div className="flex items-center justify-between text-[12px]">
-            {product.buyUrl && /^https?:\/\//.test(product.buyUrl) ? <a href={product.buyUrl} target="_blank" rel="noopener noreferrer" className="link">View at retailer</a> : <span className="text-muted">Retailer link unavailable</span>}
+            {product.buyUrl && /^https?:\/\//.test(product.buyUrl) ? <a href={product.buyUrl} target="_blank" rel="noopener noreferrer" className="link">View at retailer</a> : <span className="text-muted">{product.demo ? 'Simulated store listing' : 'Retailer link unavailable'}</span>}
             {feedback ? <span className="text-sage">{feedback}</span> : (
               <span className="flex gap-4 text-muted">
                 <button type="button" className="hover:text-ink" onClick={() => send({ type: 'like' }, 'Noted, thank you')}>Like</button>
@@ -127,7 +147,9 @@ export default function ProductCard({ card, category, inCart, onAdded, onBuyNow,
           )}
           {error && <p className="text-xs text-wine">{error}</p>}
           <p className="text-[10.5px] uppercase tracking-wider text-muted">
-            Price verified · Rating {card.verified.rating ? 'verified' : 'not listed'} · Specs {card.verified.specs ? 'from listing' : 'not listed'}
+            {product.demo
+              ? 'Simulated price, rating and delivery time (demo data)'
+              : `Price verified · Rating ${card.verified.rating ? 'verified' : 'not listed'} · Specs ${card.verified.specs ? 'from listing' : 'not listed'}`}
           </p>
         </div>
       </div>

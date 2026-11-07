@@ -32,8 +32,18 @@ export function Recommendations({ block, cartIds, onCart, onBuyNow, rejectReason
         <>
           <p className="eyebrow mb-3 !text-muted">
             {block.stats.considered} listings compared · {block.stats.eligible} met your requirements
-            {block.profileUsed?.dominant ? ' · ordered by your priority' : ''}
           </p>
+          {block.basketPlan && (
+            <div className="mb-4 border border-rule bg-paper p-4">
+              <p className="eyebrow">Why these baskets, in this order</p>
+              <ol className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-[13px]">
+                {block.basketPlan.order.map((b, i) => <li key={b.basket}><span className="text-brass">{i + 1}.</span> <b>{b.label}</b></li>)}
+              </ol>
+              <ul className="mt-2 space-y-1 text-[13px] leading-snug text-muted">
+                {block.basketPlan.lines.map((line) => <li key={line}>{line}</li>)}
+              </ul>
+            </div>
+          )}
           <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
             {block.cards.map((card) => (
               <ProductCard key={card.product.id} card={card} category={block.category} inCart={cartIds.has(card.product.id)}

@@ -1,10 +1,23 @@
 # Buypal: an AI personal shopping agent with PayPal checkout
 
-Buypal turns shopping into a conversation. Tell it what you need ("a lightweight laptop for college under ₹60,000", "build me a complete gaming setup under ₹1,00,000"). It searches real product listings, scores them with transparent logic, explains every pick, learns what you like, builds multi-product carts and checks out through **PayPal Sandbox**.
+Buypal turns shopping into a conversation about *anything you can buy online*. Describe what you want in your own words ("salted butter 500 g delivered within 15 minutes", "a lightweight laptop for college under ₹60,000"). An AI agent reads the request, compares stores, and sorts the options into **baskets**: *best price*, *best quality*, *best overall* and *quickest delivery*. The basket order and mix **adapt to each shopper** as they choose and buy. Checkout is through **PayPal Sandbox**.
 
 Built for the PayPal *Build What's Next with PayPal and AI* hackathon.
 
 > **Honest scope.** PayPal checkout cannot buy from arbitrary third-party stores. In this demo the Sandbox payment goes to Buypal's own test merchant. No retailer order is created, nothing is delivered, and there is no escrow. "View at retailer" links open the retailer's real product page.
+
+> **Where the data comes from (please read).** Amazon, Flipkart, Blinkit and Zepto have no public product APIs and scraping them is against their terms, so Buypal does not claim to query them. It uses two providers behind one interface (`server/services/catalog.js`):
+> 1. **Channel3** (real): live listings from US retailers such as Best Buy and Walmart. It reports no delivery times and carries almost no groceries.
+> 2. **Demo store feed** (`server/providers/demoStores.js`, **simulated**): fictional stores (QuickCart, DashMart, FreshSlot, MegaMarket, BazaarHub) and fictional brands, with deterministic prices, ratings and delivery times for everyday items. Every such listing is flagged `demo: true` and shown with a "Demo data" badge. It exists so the full basket comparison, including quickest delivery, can be demonstrated end to end.
+>
+> To go live, add real adapters (for example Flipkart Affiliate API, Amazon PA-API, or a Google Shopping API) that return the same listing shape. Turn the demo feed off with `DEMO_STORES=off`.
+
+## The AI core: baskets that learn the shopper
+
+1. **Understanding.** The LLM turns a free-form description into structured requirements (product, size, must-haves, budget, how soon it is needed) and calls the comparison tool once per item.
+2. **Comparing.** Deterministic code (not the LLM) filters like with like (same pack size, relevant category), scores every listing and picks a winner per basket. Delivery fees count towards "best price"; "quickest delivery" only uses stores that report a delivery time.
+3. **Reading the shopper.** Buypal keeps an explainable model of each user (stated priority, which baskets they actually choose and buy, categories, brands, typical spend). It decides which baskets appear **first**, which get a **runner-up card**, and is passed to the LLM so its recommendation is personal. The "Why these baskets, in this order" box and the profile page show exactly why.
+4. **Changing over time.** Choose quickest delivery three times and it moves to the front for everything. Say "within 15 minutes" and it leads for that request only.
 
 ## Features
 
@@ -12,7 +25,7 @@ Built for the PayPal *Build What's Next with PayPal and AI* hackathon.
 |---|---|
 | **Conversational agent** | One LLM agent (Groq, free tier) calls deterministic tools: search, scoring, cart, preferences. Falls back to a rule-based parser if the AI is unavailable. |
 | **Product discovery** | Channel3 product search API (price, ratings, availability, specs from listing text). Nothing is invented: missing data is shown as "not listed". |
-| **Your priority** | On first visit you choose what matters most: lowest price, best quality, or best balance. Buypal leads with that pick and tunes every ranking and recommendation to it. Change it any time. |
+| **Your priority** | On first visit you choose what matters most: lowest price, best quality, best balance, or fastest delivery. Buypal leads with that pick and tunes every ranking and recommendation to it. Change it any time. |
 | **Personalised home** | Searches, likes, cart adds and purchases build an explainable interest list (fading by half every 14 days). The home page shows "Picked for you" and verified deals in those categories, and says which searches it is based on. |
 | **Adaptive 3-strategy picks** | **Best price**, **Best overall** and **Best quality**, scored by code, not by the LLM. Each product also lists the retailers selling it and their prices. Cards merge when one product wins several strategies, and extra cards (runner-up, top rated, stretch) appear based on your history and the data. Each card shows pros, cons, why it was picked, and how it fits your preferences. |
 | **Personalization** | Explainable counters per brand and strategy, with global and per-category scopes. Learns from adds, likes, rejections (with a reason) and purchases. View, edit, delete or reset everything in the profile panel. |
@@ -100,7 +113,7 @@ npm run dev
 npm test
 ```
 
-21 tests cover spec extraction, intent parsing, the scoring engine (budget, dedupe, personalization, missing data), the cart optimiser, preference learning, your priority setting, the interest model, currency handling and the HTTP API.
+29 tests cover spec extraction, intent parsing, the scoring engine (budget, dedupe, personalization, missing data), the cart optimiser, preference learning, your priority setting, the interest model, currency handling and the HTTP API.
 
 ## Known limitations
 

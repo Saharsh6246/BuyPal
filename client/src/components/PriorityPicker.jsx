@@ -2,6 +2,7 @@ const OPTIONS = [
   { key: 'price', title: 'Lowest price', note: 'The cheapest option that still meets your needs.' },
   { key: 'quality', title: 'Best quality', note: 'Performance, build and reviews come first.' },
   { key: 'balanced', title: 'Best balance', note: 'The most value for what you pay.' },
+  { key: 'speed', title: 'Fastest delivery', note: 'Get it as soon as possible, from whichever store is quickest.' },
 ];
 
 /** First-visit choice (cards) and the compact switcher (segmented). */
@@ -19,7 +20,7 @@ export default function PriorityPicker({ value, onChange, variant = 'cards' }) {
     );
   }
   return (
-    <div role="radiogroup" aria-label="What matters most to you" className="grid gap-3 sm:grid-cols-3">
+    <div role="radiogroup" aria-label="What matters most to you" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       {OPTIONS.map((o, i) => (
         <button key={o.key} type="button" role="radio" aria-checked={value === o.key} onClick={() => onChange(o.key)}
           className={`border bg-paper p-5 text-left transition hover:border-ink ${value === o.key ? 'border-ink' : 'border-rule'}`}>

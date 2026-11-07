@@ -7,12 +7,11 @@ import { buildRecommendations, filterCandidates, publicProduct } from './scoring
 // Personalised home feed: "picked for you" (best match for the user's priority in the categories they
 // searched) and "deals" (verified discounts vs the listed regular price). All from real listings.
 
-const STARTER_CATEGORIES = ['laptop', 'headphones', 'monitor'];
-const PRIORITY_ROLE = { price: 'Budget', quality: 'Premium', balanced: 'Smart' };
+const STARTER_CATEGORIES = ['milk', 'phone charger', 'headphones'];
+const PRIORITY_ROLE = { price: 'Budget', quality: 'Premium', balanced: 'Smart', speed: 'Fastest' };
 const TTL_MS = 10 * 60 * 1000;
 const cache = new Map();
 
-const plural = (c) => (c === 'headphones' ? c : `${c}s`);
 const join = (items) => (items.length <= 1 ? items[0] || '' : `${items.slice(0, -1).join(', ')} and ${items.at(-1)}`);
 
 export async function buildHome(userId) {
@@ -50,7 +49,7 @@ export async function buildHome(userId) {
     .sort((a, b) => b.pct - a.pct).slice(0, 8)
     .map((d) => ({ category: d.category, product: d.product, label: `${d.pct}% off`, reason: `${fmtUsd(d.product.compareAtPrice - d.product.price)} below the listed regular price` }));
 
-  const names = join(targets.map((t) => plural(t.category)));
+  const names = join(targets.map((t) => t.category));
   const data = {
     personalised,
     priority,

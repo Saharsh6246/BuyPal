@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { api, money } from '../api.js';
+import { api, inr, money } from '../api.js';
+import { DemoBadge } from './ProductCard.jsx';
 import PriorityPicker from './PriorityPicker.jsx';
 
 const EXAMPLES = [
+  'Salted butter 500 g delivered within 15 minutes',
+  'A 20W phone charger, as fast as possible',
   'A lightweight laptop for college under ₹60,000',
-  'A gaming laptop under $900 with a good display',
   'Build me a complete gaming setup under ₹1,00,000',
-  'A wireless mouse under $30',
 ];
 
 function Tile({ item, inCart, onAdded, onSearch }) {
@@ -25,13 +26,13 @@ function Tile({ item, inCart, onAdded, onSearch }) {
         {product.image ? <img src={product.image} alt={product.name} loading="lazy" className="max-h-full max-w-full object-contain" /> : <span className="text-xs text-muted">Image unavailable</span>}
       </div>
       <div className="flex flex-1 flex-col gap-1.5 p-4">
-        <p className="eyebrow">{item.label}</p>
+        <div className="flex items-center justify-between"><p className="eyebrow">{item.label}</p>{product.demo && <DemoBadge />}</div>
         <h3 className="serif line-clamp-2 text-[19px] font-semibold leading-tight">{product.name}</h3>
-        <p className="serif text-2xl font-semibold">{money(product.price)} {product.compareAtPrice && <s className="ml-1 text-sm font-normal text-muted">{money(product.compareAtPrice)}</s>}</p>
+        <p className="serif text-2xl font-semibold">{money(product.price)} <span className="font-sans text-xs font-normal text-muted">{inr(product.price)}</span> {product.compareAtPrice && <s className="ml-1 text-sm font-normal text-muted">{money(product.compareAtPrice)}</s>}</p>
         <p className="text-[12px] leading-snug text-muted">{item.reason}</p>
-        <p className="text-[11.5px] text-muted">{product.merchant || 'Retailer not listed'}{offers > 1 ? ` · ${offers} retailers` : ''}</p>
+        <p className="text-[11.5px] text-muted">{product.merchant || 'Retailer not listed'}{offers > 1 ? ` · ${offers} stores` : ''}{product.delivery ? ` · ${product.delivery.label}` : ''}</p>
         <div className="mt-auto flex items-center justify-between pt-3 text-[12px]">
-          <button type="button" className="link" onClick={() => onSearch(`best ${item.category}`)}>Find the best {item.category}</button>
+          <button type="button" className="link" onClick={() => onSearch(item.category)}>Compare stores</button>
           <button type="button" className="btn btn-outline !px-3 !py-1.5" disabled={busy || inCart} onClick={add}>{inCart ? 'In cart' : busy ? '…' : 'Add'}</button>
         </div>
         {error && <p className="text-xs text-wine">{error}</p>}
@@ -49,11 +50,11 @@ export default function Home({ home, loading, priority, onPriority, cartIds, onC
       <section className="mx-auto max-w-3xl text-center animate-rise">
         <p className="eyebrow">Your personal shopping desk</p>
         <h1 className="serif mt-3 text-5xl font-semibold leading-[1.05] sm:text-7xl">What shall we find<br className="hidden sm:block" /> for you today?</h1>
-        <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-muted">Name anything you would like to buy. Buypal compares real listings across retailers and presents the best on price, the best on quality, and the best overall, led by what matters to you.</p>
+        <p className="mx-auto mt-4 max-w-xl text-[15px] leading-relaxed text-muted">Describe anything you want, from groceries delivered in minutes to a new laptop. Buypal compares stores and sorts the options into baskets (best price, best quality, best overall, quickest delivery), arranged around how you actually shop.</p>
         <form onSubmit={submit} className="field mx-auto mt-8 flex max-w-2xl items-center gap-2 p-1.5">
           <label htmlFor="home-search" className="sr-only">What would you like to buy?</label>
           <input id="home-search" value={draft} onChange={(e) => setDraft(e.target.value)} maxLength={1000} autoComplete="off"
-            placeholder="A laptop for college under ₹80,000 with good battery life" className="min-w-0 flex-1 bg-transparent px-3 py-3 text-[15px] outline-none placeholder:text-muted/70" />
+            placeholder="Describe what you need, e.g. organic milk 1 litre in 10 minutes" className="min-w-0 flex-1 bg-transparent px-3 py-3 text-[15px] outline-none placeholder:text-muted/70" />
           <button type="submit" className="btn btn-primary" disabled={draft.trim().length < 2}>Search</button>
         </form>
         <ul className="mx-auto mt-5 max-w-2xl space-y-1 text-left text-[13.5px]">

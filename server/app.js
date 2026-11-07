@@ -9,6 +9,7 @@ import { addItem, CartError, clearCart, getCart, removeItem, setQuantity } from 
 import { llmUsage } from './services/llm.js';
 import { captureOrder, createOrder, listOrders, PayPalError } from './services/paypal.js';
 import { buildHome } from './services/home.js';
+import { getUserModel } from './services/insights.js';
 import { describeProfile, getPriority, listPreferences, PRIORITIES, recordEvent, REJECT_REASONS, resetPreferences, setPreference, setPriority } from './services/preferences.js';
 import { getCachedProduct } from './services/channel3.js';
 
@@ -64,6 +65,7 @@ app.put('/api/settings', requireUser, wrap(async (req, res) => {
   try { setPriority(req.userId, req.body?.priority); } catch (error) { return res.status(400).json({ error: error.message }); }
   res.json({ priority: getPriority(req.userId), summary: describeProfile(req.userId) });
 }));
+app.get('/api/insights', requireUser, (req, res) => res.json(getUserModel(req.userId)));
 app.get('/api/home', requireUser, wrap(async (req, res) => res.json(await buildHome(req.userId))));
 
 app.get('/api/history', requireUser, (req, res) => res.json({ messages: loadHistory(req.userId) }));

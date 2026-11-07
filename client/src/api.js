@@ -30,6 +30,7 @@ async function call(path, { method = 'GET', body } = {}) {
 export const api = {
   config: () => call('/config'),
   me: () => call('/me'),
+  insights: () => call('/insights'),
   setPriority: (priority) => call('/settings', { method: 'PUT', body: { priority } }),
   home: () => call('/home'),
   history: () => call('/history'),
@@ -48,6 +49,11 @@ export const api = {
   captureOrder: (orderId) => call(`/paypal/orders/${encodeURIComponent(orderId)}/capture`, { method: 'POST' }),
   orders: () => call('/orders'),
 };
+
+// Approximate rupee equivalent shown next to dollar prices (the rate comes from the server config).
+let inrPerUsd = 85;
+export const setInrRate = (rate) => { if (Number(rate) > 0) inrPerUsd = Number(rate); };
+export const inr = (usd) => `≈ ₹${Math.round(Number(usd) * inrPerUsd).toLocaleString('en-IN')}`;
 
 export const money = (value) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }).format(value);

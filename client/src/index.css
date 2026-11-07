@@ -13,6 +13,7 @@
   --color-bottle: #1e3b2f;
   --color-wine: #7a2e2e;
   --color-sage: #3f6a4f;
+  --color-slate: #2f4a5c;
   --animate-rise: rise 0.4s ease-out both;
   @keyframes rise {
     from { opacity: 0; transform: translateY(6px); }

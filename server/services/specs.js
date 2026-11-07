@@ -75,6 +75,16 @@ export function extractSpecs(text) {
   return specs;
 }
 
+const UNIT = { g: ['g', 1], gm: ['g', 1], kg: ['g', 1000], ml: ['ml', 1], l: ['ml', 1000], ltr: ['ml', 1000], litre: ['ml', 1000], litres: ['ml', 1000], liter: ['ml', 1000] };
+
+/** Pack size from text such as "500 g", "1 kg" or "1 litre", normalised to grams or millilitres. Null when none is stated. */
+export function parseSize(text) {
+  const m = String(text || '').toLowerCase().match(/(\d+(?:\.\d+)?)\s?(kg|gm|g|ml|ltr|litres?|liters?|l)\b/);
+  if (!m) return null;
+  const [unit, factor] = UNIT[m[2]];
+  return { unit, qty: Math.round(Number(m[1]) * factor * 1000) / 1000 };
+}
+
 /** Short, human-readable chips built only from specs that were actually found. */
 export function specChips(specs) {
   const chips = [];

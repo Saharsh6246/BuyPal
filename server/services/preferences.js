@@ -8,8 +8,9 @@ export const PRIORITIES = {
   price: 'Lowest price that still meets your needs',
   quality: 'Best quality and performance',
   balanced: 'The best balance of price and quality',
+  speed: 'The fastest delivery',
 };
-const PRIORITY_STRATEGY = { price: 'Budget', quality: 'Premium', balanced: 'Smart' };
+const PRIORITY_STRATEGY = { price: 'Budget', quality: 'Premium', balanced: 'Smart', speed: 'Fastest' };
 
 export function getSetting(userId, key) {
   return get('SELECT value FROM user_settings WHERE user_id=? AND key=?', userId, key)?.value ?? null;
@@ -24,7 +25,7 @@ export function setPriority(userId, priority) {
   setSetting(userId, 'priority', priority);
 }
 const clamp = (value) => Math.max(-MAX, Math.min(MAX, value));
-export const STRATEGIES = ['Budget', 'Smart', 'Premium'];
+export const STRATEGIES = ['Budget', 'Smart', 'Premium', 'Fastest'];
 const normKey = (dimension, key) => (dimension === 'brand' ? String(key).trim().toLowerCase().slice(0, 80) : String(key).trim());
 
 export const REJECT_REASONS = {
@@ -91,7 +92,7 @@ export function listPreferences(userId) {
 export function getProfile(userId, category) {
   const rows = listPreferences(userId);
   const cat = category ? String(category).toLowerCase() : null;
-  const merged = { brand: {}, strategy: { Budget: 0, Smart: 0, Premium: 0 } };
+  const merged = { brand: {}, strategy: { Budget: 0, Smart: 0, Premium: 0, Fastest: 0 } };
   for (const row of rows) {
     const weight = row.scope === 'global' ? 0.5 : row.scope === cat ? 1 : 0;
     if (!weight) continue;
@@ -103,7 +104,18 @@ export function getProfile(userId, category) {
   const budgetSensitivity = Math.max(-1, Math.min(1, (strategy.Budget - strategy.Premium) / 4));
   const ranked = Object.entries(strategy).sort((a, b) => b[1] - a[1]);
   const dominant = ranked[0][1] >= 2 && ranked[0][1] - ranked[1][1] >= 1 ? ranked[0][0] : null;
-  return { brand: merged.brand, strategy, budgetSensitivity, dominant, priority };
+  // How often each basket was actually chosen or bought. Shown to the user as the reason baskets are ordered as they are.
+  const tally = {};
+  for (const row of all("SELECT strategy, COUNT(*) AS n FROM feedback_events WHERE user_id=? AND type IN ('select','purchase') AND strategy IS NOT NULL GROUP BY strategy", userId)) if (STRATEGIES.includes(row.strategy)) tally[row.strategy] = row.n;
+  // Consistent behaviour across categories counts as a strong signal even though category scopes only carry half weight globally.
+  const totalPicks = Object.values(tally).reduce((a, b) => a + b, 0);
+  const [topBasket, topCount] = Object.entries(tally).sort((a, b) => b[1] - a[1])[0] || [null, 0];
+  let finalDominant = dominant;
+  if (!finalDominant && totalPicks >= 3 && topCount / totalPicks >= 0.6 && STRATEGIES.includes(topBasket)) {
+    finalDominant = topBasket;
+    strategy[topBasket] += 2;
+  }
+  return { brand: merged.brand, strategy, budgetSensitivity, dominant: finalDominant, priority, tally };
 }
 
 export function setPreference(userId, scope, dimension, key, score) {
@@ -131,7 +143,7 @@ export function describeProfile(userId) {
   const profile = getProfile(userId, null);
   const lines = [];
   if (profile.priority) lines.push(`Your priority: ${PRIORITIES[profile.priority].toLowerCase()}.`);
-  if (profile.dominant) lines.push(`You usually pick ${profile.dominant} options, so those are shown first.`);
+  if (profile.dominant) lines.push(`You usually pick ${{ Budget: 'Best price', Smart: 'Best overall', Premium: 'Best quality', Fastest: 'Quickest delivery' }[profile.dominant]} options, so those are shown first.`);
   if (profile.budgetSensitivity > 0.4) lines.push('You tend to prioritise saving money.');
   if (profile.budgetSensitivity < -0.4) lines.push('You tend to prioritise quality and performance.');
   const liked = Object.entries(profile.brand).filter(([, s]) => s >= 1).map(([b]) => b);

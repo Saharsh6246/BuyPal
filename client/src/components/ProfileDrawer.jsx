@@ -6,8 +6,13 @@ export default function ProfileDrawer({ open, onClose, priority, onPriority, onR
   const [data, setData] = useState({ preferences: [], summary: [] });
   const [error, setError] = useState('');
 
-  const load = () => api.preferences().then(setData).catch((e) => setError(e.message));
-  useEffect(() => { if (open) load(); }, [open]);
+  const [insights, setInsights] = useState(null);
+  const load = () => {
+    api.preferences().then(setData).catch((e) => setError(e.message));
+    api.insights().then(setInsights).catch(() => {});
+  };
+  useEffect(() => { if (open) load(); }, [open, priority]);
+  const BASKETS = [['Budget', 'Best price'], ['Smart', 'Best overall'], ['Premium', 'Best quality'], ['Fastest', 'Quickest delivery']];
 
   const change = async (row, score) => {
     try { setData(await api.setPreference({ scope: row.scope, dimension: row.dimension, key: row.key, score })); } catch (e) { setError(e.message); }
@@ -41,6 +46,31 @@ export default function ProfileDrawer({ open, onClose, priority, onPriority, onR
             <PriorityPicker variant="segmented" value={priority} onChange={onPriority} />
             <p className="mt-2 text-[12.5px] text-muted">This decides which pick Buypal leads with, and what it recommends on your home page.</p>
           </section>
+          {insights && (
+            <section>
+              <h3 className="eyebrow mb-2 !text-muted">Buypal’s read on you</h3>
+              {insights.totalPicks === 0 ? (
+                <p className="border border-rule bg-canvas p-4 text-muted">Choose a few picks and Buypal will start arranging its baskets around you.</p>
+              ) : (
+                <div className="space-y-3 border border-rule bg-canvas p-4">
+                  <ul className="space-y-1.5">
+                    {BASKETS.map(([key, label]) => {
+                      const n = insights.basketTally[key] || 0;
+                      return (
+                        <li key={key} className="flex items-center gap-3 text-[13px]">
+                          <span className="w-32 flex-none">{label}</span>
+                          <span className="h-[5px] flex-1 bg-rule"><span className="block h-full bg-bottle" style={{ width: `${Math.round((n / insights.totalPicks) * 100)}%` }} /></span>
+                          <span className="w-6 text-right text-muted">{n}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  <ul className="space-y-1 text-[13px] leading-snug">{insights.lines.map((line) => <li key={line}>{line}</li>)}</ul>
+                  <p className="text-[11.5px] text-muted">Built only from your own choices and orders. It decides which baskets appear first and which get a runner-up.</p>
+                </div>
+              )}
+            </section>
+          )}
           {data.summary.length > 0 && <ul className="space-y-1 border-l-2 border-brass bg-canvas px-4 py-3 text-[13px]">{data.summary.map((line) => <li key={line}>{line}</li>)}</ul>}
           <p className="text-[13px] leading-relaxed text-muted">Buypal learns from what you search, add, like, reject and buy. Nothing is hidden: review, correct or reset it below. Brand preferences can differ by category.</p>
           {data.preferences.length === 0 && <p className="border border-rule bg-canvas p-4 text-muted">Nothing learned yet. Add a pick to your cart or choose “Like” on a recommendation.</p>}
@@ -51,7 +81,7 @@ export default function ProfileDrawer({ open, onClose, priority, onPriority, onR
                 {rows.map((row) => (
                   <li key={`${row.scope}-${row.dimension}-${row.key}`} className="flex items-center justify-between border border-rule px-3 py-2">
                     <div>
-                      <p className="serif text-lg font-semibold capitalize">{row.dimension === 'brand' ? row.key : `${{ Budget: 'Price', Premium: 'Quality', Smart: 'Overall value' }[row.key] || row.key} focus`}</p>
+                      <p className="serif text-lg font-semibold capitalize">{row.dimension === 'brand' ? row.key : `${{ Budget: 'Price', Premium: 'Quality', Smart: 'Overall value', Fastest: 'Speed' }[row.key] || row.key} focus`}</p>
                       <p className="text-[11.5px] text-muted">{row.dimension} · {row.score > 0 ? 'you lean towards this' : 'less preferred'} ({row.score > 0 ? '+' : ''}{Math.round(row.score * 10) / 10})</p>
                     </div>
                     <div className="flex items-center gap-1">
