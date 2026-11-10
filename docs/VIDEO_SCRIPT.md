@@ -31,11 +31,14 @@
 *Screen:* new chat: **"Build me a high quality yet affordable gaming setup under ₹1,00,000"**. Show three baskets; open one; hover over a **Buy at** button; tick **I bought this**.
 > "For bigger goals it builds complete setups, each verified to fit my budget. I open a basket and get the retailer link for every part. No public API lets an app place orders at the big retailers, so I finish each purchase at the store I choose. We're honest about that."
 
-### 1:55 to 2:40 · PayPal is the engine
+### 1:55 to 2:45 · PayPal is the engine (about 50 seconds; if you run over, trim "It learns you")
 *Screen:* click the coin chip to open the **wallet**. Point at the balance, the costs, then the two earning paths. Do the **top-up** with PayPal Sandbox; show the balance rise and the history line.
-> "Here is where PayPal comes in. Buypal's AI work is paid for in Pal Points: a search costs one, a full setup costs four. Shoppers earn points by paying with PayPal. They can top up through the PayPal Orders API: the server owns the amount, verifies the capture with PayPal, and credits points exactly once. And when they pay with PayPal at a retailer, they can claim a reward. We label those claims self-reported, because no app can see a customer's payments at another merchant."
+> "Here is where PayPal comes in. Buypal's AI work is paid for in Pal Points: a search costs one, a full setup costs four. Shoppers earn points by paying with PayPal. They can top up through the PayPal Orders API: the server sets the price, verifies the capture with PayPal, and credits the points exactly once."
 
-### 2:40 to 2:55 · Close
+*Screen:* scroll to the first earning option, "Paid with PayPal at a retailer".
+> "The second way to earn is to pay with PayPal at a retailer and claim a reward. We have not built automatic checking of those payments yet. No app can see a customer's payments at another store, so today these claims are self-reported, with limits and duplicate protection, and labelled that way. Verifying them properly, through retailer partnerships or PayPal data, is the next thing we would build."
+
+### 2:45 to 2:58 · Close
 *Screen:* back to the home page, then the GitHub repo page.
 > "Buypal: find the best version of anything, explained, personal, and powered by PayPal. It's open source under MIT, and it runs from the README with no API keys."
 

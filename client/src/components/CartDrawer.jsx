@@ -156,6 +156,11 @@ export default function CartDrawer({ open, onClose, cart, setCart, orders, refre
             <div className="py-10 text-center text-muted"><p className="display text-2xl font-semibold text-ink">Your cart is empty</p><p className="text-sm">Ask Buypal for a product and add the picks you like.</p></div>
           ) : (
             <>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold uppercase tracking-wide text-muted">{cart.count} {cart.count === 1 ? 'item' : 'items'}</span>
+                <button type="button" className="text-[13px] font-semibold text-muted transition hover:text-danger"
+                  onClick={() => { if (window.confirm('Remove everything from your cart?')) guard(() => api.clearCart()); }}>Clear cart</button>
+              </div>
               <ul className="space-y-3">
                 {cart.items.map((item) => (
                   <li key={item.id} className="flex gap-3">
