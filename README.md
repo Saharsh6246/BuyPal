@@ -1,134 +1,143 @@
-# Buypal: an AI personal shopping agent with PayPal checkout
+# Buypal
 
-Buypal turns shopping into a conversation about *anything you can buy online*. Describe what you want in your own words ("salted butter 500 g", "a lightweight laptop for college under ₹60,000"). An AI agent reads the request, compares stores, and sorts the options into **cards**: *best overall*, *best quality*, *best price*, *most loved*, *best deal* and *picked for you*. The order and mix **adapt to each shopper** as they choose and buy. Checkout is through **PayPal Sandbox**.
+**An AI shopping agent that compares stores for anything you want to buy, explains every pick, and is paid for with PayPal.**
 
-Built for the PayPal *Build What's Next with PayPal and AI* hackathon.
+Describe what you want in your own words ("a lightweight laptop for college under ₹60,000", "salted butter 500 g", "build me a high quality yet affordable gaming setup"). Buypal's AI agent understands the request, deterministic code compares real listings across stores, and the options come back as clear cards (*best overall, best quality, best price, most loved, best deal, picked for you*) arranged around how **you** shop. The shopper completes the purchase at the retailer they choose. The AI work itself runs on **Pal Points**, which shoppers earn by paying with **PayPal**.
 
-> **Honest scope.** PayPal checkout cannot buy from arbitrary third-party stores. In this demo the Sandbox payment goes to Buypal's own test merchant. No retailer order is created, nothing is delivered, and there is no escrow. "View at retailer" links open the retailer's real product page.
+Built for the PayPal *Build What's Next with PayPal and AI* hackathon. Open source under the [MIT license](LICENSE).
 
-> **Where the data comes from (please read).** Amazon, Flipkart, Blinkit and Zepto have no public product APIs and scraping them is against their terms, so Buypal does not claim to query them. It uses two providers behind one interface (`server/services/catalog.js`):
-> 1. **Channel3** (real): live listings from US retailers such as Best Buy and Walmart. It carries almost no groceries.
-> 2. **Google Shopping via SerpApi** (real, optional, `server/providers/googleShopping.js`): offers from many US merchants (Amazon, Walmart, Target and others) with prices and ratings. Set `SERPAPI_KEY` to enable it. Results are cached for a day and calls stop at `SERPAPI_MONTHLY_LIMIT` (default 200) so the free plan cannot be exceeded. Delivery text is used only when Google shows it, and an arrival time is only inferred when the text states one. It was written to SerpApi's documented response shape and should be checked against a live key.
-> 3. **Demo store feed** (`server/providers/demoStores.js`, **simulated**): fictional stores (QuickCart, DashMart, FreshSlot, MegaMarket, BazaarHub) and fictional brands, with deterministic prices and ratings for everyday items. Every such listing is flagged `demo: true` and shown with a "Demo data" badge. It exists so the full comparison can be demonstrated for everyday items that no free, legal API covers.
->
-> **Delivery time is deliberately not modelled.** It cannot be calculated reliably from any available source, so Buypal never shows or promises it.
->
-> More real adapters (for example the eBay or Best Buy APIs) can be added the same way by returning the same listing shape. Turn the demo feed off with `DEMO_STORES=off`.
-
-## The AI core: baskets that learn the shopper
-
-1. **Understanding.** The LLM turns a free-form description into structured requirements (product, size, must-haves, budget, how soon it is needed) and calls the comparison tool once per item.
-2. **Comparing.** Deterministic code (not the LLM) filters like with like (same pack size, relevant category), scores every listing and picks a winner per card. The final buckets are: **Best overall** (quality for the money), **Best quality**, **Best price**, **Most loved** (top rating with 50+ reviews), **Best deal** (a credible verified markdown on a well-rated product) and **Picked for you** (the best option from a brand the shopper has shown they like), plus a **Stretch pick** when the shopper allows going over budget. Extras only appear when the data supports them, and the screen says what was left out and why.
-3. **Reading the shopper.** Buypal keeps an explainable model of each user (stated priority, which baskets they actually choose and buy, categories, brands, typical spend). It decides which baskets appear **first**, which get a **runner-up card**, and is passed to the LLM so its recommendation is personal. The "Why these baskets, in this order" box and the profile page show exactly why.
-4. **Changing over time.** Choose Best price three times and it moves to the front for everything, and gets a runner-up card.
-
-## Features
-
-| Area | What it does |
+| | |
 |---|---|
-| **Conversational agent** | One LLM agent (Groq, free tier) calls deterministic tools: search, scoring, cart, preferences. Falls back to a rule-based parser if the AI is unavailable. |
-| **Product discovery** | Channel3 product search API (price, ratings, availability, specs from listing text). Nothing is invented: missing data is shown as "not listed". |
-| **Your priority** | On first visit you choose what matters most: lowest price, best quality, or best balance. Buypal leads with that pick and tunes every ranking and recommendation to it. Change it any time. |
-| **Personalised home** | Searches, likes, cart adds and purchases build an explainable interest list (fading by half every 14 days). The home page shows "Picked for you" and verified deals in those categories, and says which searches it is based on. |
-| **Adaptive 3-strategy picks** | **Best price**, **Best overall** and **Best quality**, scored by code, not by the LLM. Each product also lists the retailers selling it and their prices. Cards merge when one product wins several strategies, and extra cards (runner-up, top rated, stretch) appear based on your history and the data. Each card shows pros, cons, why it was picked, and how it fits your preferences. |
-| **Personalization** | Explainable counters per brand and strategy, with global and per-category scopes. Learns from adds, likes, rejections (with a reason) and purchases. View, edit, delete or reset everything in the profile panel. |
-| **Setup baskets** | "Build me a high quality yet affordable gaming setup under ₹1,00,000" produces several COMPLETE setups (best overall, best quality and best price), each verified to fit the budget and ordered for the shopper. Open a basket to see each part with its **retailer link** (Amazon, Walmart, Best Buy and others, from Channel3 / Google Shopping), alternative stores, a "copy shopping list" button, and an "I bought this" tick that teaches Buypal. Only listings with a real retailer link are used. |
-| **Cart edits** | A chosen basket can become the cart ("Use as cart"). Natural-language edits ("replace the mouse with a wireless one and reduce the total by ₹2,000") are re-searched and re-verified. |
-| **Buy now (demo checkout)** | One click adds the pick and opens the review-and-pay step. Nothing is charged until you tick the approval box and approve in PayPal Sandbox. |
+| **Repository** | https://github.com/Saharsh6246/BuyPal |
+| **Submission text** | [SUBMISSION.md](SUBMISSION.md) |
+| **Demo video script** | [docs/VIDEO_SCRIPT.md](docs/VIDEO_SCRIPT.md) |
 
-> **Future work: one-click purchase at the retailer.** Today the shopper completes each purchase on the retailer's own site. Amazon, Walmart and similar stores have no public API that lets an outside app place orders for a customer, and Channel3's checkout is listed as "coming soon". If such an API becomes available (a retailer ordering API, Channel3 checkout, or a retailer-supported agentic-commerce protocol), Buypal's design supports it: baskets already hold verified listings, totals and approvals, and the PayPal order flow in `server/services/paypal.js` is where a real purchase would plug in.
-| **PayPal Sandbox** | Orders API v2 with the v6 JS SDK. Server-side amounts, live price re-verification before the order, explicit user approval step, atomic capture lock, idempotency, amount and currency verification, and failed / cancelled / pending handling. |
+---
+
+## Quick start for judges
+
+Requires **Node.js 22.5 or newer** (the app uses the built-in `node:sqlite`, so there is no database to install).
+
+```bash
+git clone https://github.com/Saharsh6246/BuyPal.git
+cd BuyPal
+npm install
+npm run build      # builds the React client
+npm start          # open http://localhost:3000
+```
+
+**It runs with no API keys at all.** Without keys you get the full interface, the comparison engine, personalisation, setup baskets, the Pal Points wallet and a built-in demo store feed (clearly labelled "Demo data"). Add keys to switch on the rest:
+
+| To see | Add to `.env` (copy `.env.example`) | Cost |
+|---|---|---|
+| **PayPal checkout and top-ups** (Sandbox) | `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` | Free Sandbox |
+| **The AI agent** | `GROQ_API_KEY` ([console.groq.com/keys](https://console.groq.com/keys)) | Free tier, no card |
+| **Real US retailer listings** | `CHANNEL3_API_KEY` ([trychannel3.com/developers](https://trychannel3.com/developers)) | Free key |
+| **Google Shopping offers** (Amazon, Walmart, Target...) | `SERPAPI_KEY` ([serpapi.com](https://serpapi.com)) | Free plan, hard-capped by Buypal |
+
+**PayPal Sandbox setup (5 minutes).** At [developer.paypal.com](https://developer.paypal.com/dashboard/applications/sandbox) create a Sandbox REST app. Make its merchant (business) sandbox account **United States**: other countries can fail with `UNSUPPORTED_PAYEE_CURRENCY`. Pay with a **Personal** sandbox buyer account (use a private window so PayPal does not reuse a logged-in seller session). No real money ever moves.
+
+**Try this:**
+1. Open the app, choose what matters most to you, and search *"a 20W phone charger"* or *"lightweight laptop for college under ₹60,000"*.
+2. Open **"Why these cards, in this order"** and **Pros, cons and fit** on a card.
+3. Ask *"Build me a high quality yet affordable gaming setup under ₹1,00,000"*, open a basket and see the per-part retailer links.
+4. Open your **Profile** to see what Buypal has learned about you, and your **wallet** (coin icon) to see Pal Points. Top up with PayPal Sandbox.
+
+`npm test` runs the 43 automated tests (no keys or network needed).
+
+---
+
+## What it does
+
+| Area | Detail |
+|---|---|
+| **Any product** | Works for electronics, everyday items and more. Free-form descriptions, pack sizes and budgets in ₹ or $ are understood. |
+| **Six card types** | **Best overall**, **Best quality**, **Best price**, **Most loved** (top rating with 50+ reviews), **Best deal** (credible verified markdown on a well-rated product), **Picked for you** (best option from a brand you like), plus **Stretch pick** if you allow going over budget. Extras only appear when the data supports them, and the screen says what was left out and why. |
+| **Explained** | Each card shows why it was picked, pros, cons, how it fits you, what is verified, and the other stores selling it. |
+| **Learns the shopper** | Stated priority plus explainable counters for brands and styles, by category. Learns from retailer clicks, adds, likes, rejections (with a reason) and purchases. Fully viewable, editable and resettable. |
+| **Personal home page** | "Picked for you" and credible deals based on what you have searched, with a note on which searches it used. |
+| **Setup baskets** | One request produces several **complete** setups (best overall, best quality, best price), each verified to fit the budget. Open a basket for the retailer link of every part, a copyable shopping list and an "I bought this" tick. |
+| **Cart and demo checkout** | A basket can become the cart; natural-language edits ("replace the mouse with a wireless one and reduce the total by ₹2,000") are re-searched and re-verified. Checkout runs on PayPal Sandbox. |
+| **Pal Points wallet** | AI searches cost points; points are earned with PayPal (below). |
+
+## How PayPal is used
+
+PayPal is not bolted on; it is the economy the product runs on.
+
+1. **Orders API v2 + JS SDK v6 (Sandbox)** for two real checkouts: the cart (demo purchase) and **Pal Points top-up packs**.
+2. **Server-authoritative payments.** Amounts always come from the server (cart or pack list), never the browser. Cart prices are re-verified against the retailer data right before an order is created. The shopper must tick an approval box and approve inside PayPal. The AI has **no payment tool**.
+3. **Verified captures.** Capture is locked atomically (no double capture), uses idempotency keys, and checks status, amount and currency against the order before anything is credited. Failed, cancelled and pending outcomes are handled.
+4. **PayPal as the reward loop.** Shoppers are rewarded for choosing PayPal: they top up through PayPal (verified), or claim points for a PayPal checkout made at a retailer (self-reported, see below). Points are credited once per PayPal order id, so a retry can never pay twice.
+
+> **About reward claims.** Buypal cannot see what a shopper pays at Amazon, Walmart or any other retailer, and PayPal has no API that reveals a user's payments at third-party merchants. Claims are therefore **self-reported**: the PayPal transaction ID format is checked (17 letters and digits), claims are capped at 3 a day and 50 points each, each transaction ID counts once across all users, and the ledger labels them "self-reported". Verifying them automatically would need retailer conversion data (for example affiliate postbacks) or a PayPal partner integration. The verified earning path is the top-up.
+
+## How AI is used
+
+- **An orchestrating agent with tools** (Groq, `openai/gpt-oss-120b`, free tier): it turns a free-form request into structured requirements (product, size, must-haves, budget) and calls `find_products`, `build_setup`, `modify_cart`, `show_cart` and `update_preference`. It then writes a short, personal recommendation.
+- **The LLM never ranks products and never touches payments.** Ranking is deterministic code on real listing data (price, ratings, review counts, specs parsed from the listing, verified markdowns), so results are explainable and testable.
+- **A user model** (priority, chosen styles, brands, categories, typical spend) decides which cards appear first and which get a runner-up, and is passed (compactly) to the model so its advice is personal.
+- **Guardrails:** it never invents products, prices or specs; simulated data is always disclosed; Buypal says plainly that it cannot place retailer orders. A hard daily cap stops model calls, so the free tier can never bill. If the AI is unavailable, a rule-based parser keeps the app working.
+
+## Where the data comes from
+
+All behind one interface (`server/services/catalog.js`), run in parallel:
+
+1. **Channel3** (real): live listings from US retailers such as Best Buy and Walmart. Cached for an hour.
+2. **Google Shopping via SerpApi** (real, optional): offers from many US merchants with prices and ratings. Cached for a day, with a hard monthly call cap (`SERPAPI_MONTHLY_LIMIT`, default 200) so the free plan cannot be exceeded.
+3. **Demo store feed** (**simulated**, `server/providers/demoStores.js`): fictional stores and brands with deterministic prices and ratings for everyday items that no free, legal API covers. Every such listing is flagged `demo: true` and shown with a "Demo data" badge. Turn it off with `DEMO_STORES=off`.
+
+Amazon, Flipkart, Blinkit and Zepto have no public product APIs and scraping them is against their terms, so Buypal does not claim to query them. **Delivery time is deliberately not modelled**: it cannot be calculated reliably from any available source.
 
 ## Architecture
 
 ```
-React + Vite + Tailwind (client/)           Express API (server/)
-  chat UI, cards, cart, profile  ───────►   routes (app.js)
-                                              ├─ agent.js        orchestrating agent (Groq tool-calling loop)
-                                              │    └─ tools.js    find_products · build_setup · modify_cart · show_cart · update_preference
-                                              ├─ intent.js       rule-based fallback understanding
-                                              ├─ scoring.js      deterministic Budget / Smart / Premium engine
-                                              ├─ setupBuilder.js multi-product optimiser + cart edits
-                                              ├─ preferences.js  explainable learning
-                                              ├─ channel3.js     product search + 1h cache
-                                              ├─ paypal.js       Orders API, verification, capture lock
-                                              └─ SQLite (node:sqlite): users, preferences, carts, orders, products, messages
+React + Vite + Tailwind (client/)            Express API (server/)
+  chat, cards, baskets, wallet,   ───────►     app.js (routes)
+  profile, cart                                  ├─ agent.js         orchestrating agent (Groq tool-calling loop)
+                                                 │    └─ tools.js     find_products · build_setup · modify_cart · show_cart · update_preference
+                                                 ├─ intent.js        rule-based fallback understanding
+                                                 ├─ scoring.js       deterministic card engine (six buckets)
+                                                 ├─ setupBuilder.js  multi-product optimiser, baskets, cart edits
+                                                 ├─ preferences.js   explainable learning     insights.js  user model
+                                                 ├─ catalog.js       providers/ channel3 · googleShopping · demoStores
+                                                 ├─ paypal.js        Orders API: cart + top-ups, verified capture
+                                                 ├─ wallet.js        Pal Points ledger, spend, claims, packs
+                                                 └─ SQLite (node:sqlite)
 ```
 
-Design choices:
+Design choices: one agent with tools (not many agents), SQLite so there is nothing to install, and an anonymous per-browser identity (no passwords; swap for real auth before production).
 
-- **One orchestrating agent with tools**, not many agents. Simpler to debug and cheaper on a free LLM quota.
-- **The LLM never ranks products and never touches payments.** There is deliberately no payment tool. Only the signed-in browser can start checkout, and capture happens only after the user approves in PayPal.
-- **Free LLM with a hard stop.** Groq's free tier needs no card and cannot bill. Buypal also counts calls per day and stops calling the model at `LLM_DAILY_LIMIT`.
-- **SQLite** (built into Node 22+) means zero database setup and persistence across restarts.
-- Identity is an anonymous per-browser id (no passwords). Swap it for real auth before any production use.
+## Pal Points
 
-## Pal Points: PayPal rewards for a shopper who shops with Buypal
+Buypal's AI work is paid for in **Pal Points** (rename them in one place: `UNIT` in `server/services/wallet.js`). They have no cash value and cannot be withdrawn.
 
-Buypal's AI work is paid for in **Pal Points** (rename them in one place: `UNIT` in `server/services/wallet.js`). Points have no cash value and cannot be withdrawn.
+- **Start:** 25 points for every new shopper.
+- **Spend:** a product search costs 1 point, a complete setup costs 4. Failed or empty searches, the home feed and plain conversation are free. Spending is atomic and a balance never goes negative.
+- **Earn:** top up with PayPal (packs of 25, 75 or 200 points, verified), or claim up to 50 points for a PayPal checkout made at a retailer (self-reported).
 
-| | |
-|---|---|
-| **Start** | Every new shopper gets 25 points. |
-| **Spend** | A product search costs 1 point and a complete setup costs 4. Failed or empty searches, the home feed and plain conversation are free. Spending is atomic and a balance can never go negative. |
-| **Earn 1: top up with PayPal (verified)** | Packs of 25, 75 or 200 points are bought through a PayPal Sandbox order to Buypal's own merchant account. The amount comes from the server's pack list, the capture is verified with PayPal (status, amount and currency), and points are credited once per PayPal order id, so a retry cannot pay twice. |
-| **Earn 2: pay with PayPal at a retailer (self-reported)** | Product cards and baskets nudge shoppers to choose PayPal at the retailer's checkout, then claim up to 50 points (1 per $1, minimum 5). The shopper enters the store, amount and the PayPal transaction ID. |
+## Project layout
 
-> **About reward claims.** Buypal cannot see what a shopper pays at Amazon, Walmart or any other retailer, and PayPal offers no API that reveals a user's payments at third-party merchants. Claims are therefore **self-reported**: they are checked for format (a PayPal transaction ID is 17 letters and digits), limited to 3 a day, each transaction ID can be claimed once across all users, and the ledger labels them "self-reported". Real verification would need retailer conversion data (for example affiliate postbacks) or a PayPal partner integration. The verified earning path is the top-up.
-
-## Brand and design
-
-The logo (`design/logo/buypal-mark.svg`) is a shopping bag with a navy handle and a check: buying, verified. The interface is built from it: navy for structure and text, azure for actions and key data, mist and white surfaces, crisp 1px lines, tabular numerals, and a Outfit / Instrument Sans type pairing. Tokens live in `client/src/index.css`; the card bucket colours in `client/src/buckets.js`. The wordmark and icons are in `client/src/components/Logo.jsx` and `icons.jsx`. The other logo explorations are in `design/logo-concepts.html`.
-
-## Run it locally
-
-Requires **Node.js 22.5 or newer** (uses the built-in `node:sqlite`).
-
-1. Get keys (all free):
-   - **Channel3** product API key: <https://trychannel3.com/developers>
-   - **PayPal Sandbox** REST app (Client ID + Secret): <https://developer.paypal.com/dashboard/applications/sandbox>. Create the merchant (business) sandbox account in the **United States**: other countries may not be able to receive USD, and PayPal then shows `UNSUPPORTED_PAYEE_CURRENCY`. Test as a **Personal** sandbox buyer account.
-   - **Groq** API key (no credit card): <https://console.groq.com/keys>. Optional: without it Buypal runs in basic mode.
-2. Copy `.env.example` to `.env` and fill in the values. Never commit `.env`.
-3. Install and run:
-
-```bash
-npm install
-npm run build        # builds the React client (installs client dependencies too)
-npm start            # http://localhost:3000
 ```
-
-For development with hot reload (client on <http://localhost:5173>, API on 3000):
-
-```bash
-npm run dev
+server/            Express API, agent, scoring, wallet, PayPal, providers, tests
+client/            React + Vite + Tailwind app (design tokens in src/index.css)
+design/            Logo and logo explorations
+docs/              Demo video script
+SUBMISSION.md      Hackathon submission text
 ```
 
 ## Configuration (`.env`)
 
 | Variable | Purpose |
 |---|---|
-| `CHANNEL3_API_KEY` | Product search |
 | `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` | PayPal **Sandbox** REST app |
-| `GROQ_API_KEY` | AI agent (optional) |
-| `GROQ_MODEL` | Default `openai/gpt-oss-120b` |
-| `LLM_DAILY_LIMIT` | Hard stop for AI calls per day (default 600) |
-| `INR_PER_USD` | Approximate rate used to convert ₹ budgets (default 85). Channel3 prices are in USD. |
+| `GROQ_API_KEY`, `GROQ_MODEL`, `LLM_DAILY_LIMIT` | AI agent (model default `openai/gpt-oss-120b`; hard daily cap, default 600) |
+| `CHANNEL3_API_KEY` | Real US retailer listings |
+| `SERPAPI_KEY`, `SERPAPI_MONTHLY_LIMIT` | Google Shopping offers and its hard monthly cap (default 200) |
+| `DEMO_STORES` | `off` hides the simulated demo store feed |
+| `INR_PER_USD` | Approximate rate for ₹ budgets (default 85); real listings are in USD |
 | `PORT`, `DB_PATH` | Server port, SQLite file (default `data/buypal.db`) |
 
-## Try it
-
-1. "Lightweight laptop for college under ₹60,000" → Budget / Smart / Premium cards. Tap **Add to cart** or **Like** on a few picks, then open the heart icon to see what Buypal learned.
-2. "Build me a complete gaming setup under ₹1,00,000" → a 5-item cart with the total checked against the budget.
-3. "Replace the mouse with a wireless one and reduce the total cost by ₹2,000" → recalculated and verified.
-4. Open the cart → **Review order & checkout** → tick the approval box → PayPal → log in with a Sandbox **personal** account.
-
-## Payment safeguards
-
-- PayPal secrets stay on the server. The browser only receives the public Client ID and an order id.
-- Amounts come from the server cart and are re-verified against Channel3 right before the order is created. If a price changed, nothing is charged.
-- The user must tick an explicit approval box and approve in PayPal. The LLM has no payment tool.
-- Capture is locked atomically so a double click or retry cannot capture twice. The captured amount and currency are checked against the order.
-- Failed, cancelled and pending outcomes are handled and shown; a changed cart blocks capture.
+For development with hot reload (client on http://localhost:5173, API on 3000) run `npm run dev`.
 
 ## Tests
 
@@ -136,18 +145,20 @@ npm run dev
 npm test
 ```
 
-29 tests cover spec extraction, intent parsing, the scoring engine (budget, dedupe, personalization, missing data), the cart optimiser, preference learning, your priority setting, the interest model, currency handling and the HTTP API.
+43 tests cover spec extraction, intent parsing, the scoring engine and all six card types, personalisation and the user model, the setup optimiser and baskets, Google Shopping parsing, the wallet (atomic spending, idempotent credits, claim validation and caps) and the HTTP API.
 
 ## Known limitations
 
-- Specs are parsed from listing text, so coverage varies by product. Compatibility between parts (ports, sizes) is not verified from listings.
-- Channel3 is a US-centric USD catalogue. Rupee budgets are converted at an approximate configurable rate.
-- `legacy-mvp/` holds the first dependency-free prototype and can be deleted.
+- **No retailer ordering.** Amazon, Walmart and similar stores have no public API that lets an outside app place orders, and Channel3's checkout is "coming soon". The shopper completes each purchase at the retailer. If such an API appears, baskets already hold verified listings, totals and approvals, and `server/services/paypal.js` is where a real purchase would plug in.
+- Retailer PayPal rewards are self-reported (see above).
+- Specs are parsed from listing text, so coverage varies; part compatibility (ports, sizes) is not verified.
+- Real listings are US retailers in USD; rupee budgets use an approximate configurable rate.
+- Google Shopping support was written to SerpApi's documented response format and tested with a live key on a few searches.
 
 ## Roadmap
 
-Voice input and output, price and availability monitoring, more category-specific spec parsers, real accounts, and additional discovery providers.
+Retailer ordering through a partner or protocol when available, automatic verification of retailer PayPal checkouts, price and availability alerts, voice input, more category-specific spec parsers, and real accounts.
 
 ## License
 
-MIT, see [LICENSE](LICENSE).
+[MIT](LICENSE)

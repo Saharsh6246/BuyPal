@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Buypal: an AI personal shopping agent with PayPal checkout",
+  "description": "Buypal: an AI shopping agent that compares stores, explains every pick, and runs on PayPal",
   "license": "MIT",
   "scripts": {
     "dev": "concurrently -n server,client -c blue,green \"npm run dev:server\" \"npm run dev:client\"",
@@ -13,7 +13,24 @@
     "start": "node server/index.js",
     "test": "node --test \"server/test/*.test.js\""
   },
-  "engines": { "node": ">=22.5" },
-  "dependencies": { "express": "^4.21.2" },
-  "devDependencies": { "concurrently": "^9.1.0" }
+  "engines": {
+    "node": ">=22.5"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Saharsh6246/BuyPal.git"
+  },
+  "homepage": "https://github.com/Saharsh6246/BuyPal#readme",
+  "keywords": [
+    "paypal",
+    "ai-agent",
+    "agentic-commerce",
+    "shopping"
+  ]
 }
